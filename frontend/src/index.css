@@ -1,0 +1,879 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  /* Control-Room Dark Navy Theme (#0a0f1c to #0f172a) with Translucent Spatial Tokens */
+  --bg-primary: #060913;
+  --bg-secondary: rgba(15, 23, 42, 0.55);
+  --bg-surface: rgba(30, 41, 59, 0.45);
+  --bg-surface-glass: rgba(255, 255, 255, 0.06);
+  --bg-surface-glass-heavy: rgba(15, 23, 42, 0.70);
+  --bg-surface-hover: rgba(255, 255, 255, 0.10);
+
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-backdrop: blur(18px) saturate(140%);
+  --glass-blur: blur(18px) saturate(140%);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-card: rgba(255, 255, 255, 0.14);
+  --border-glow: rgba(34, 211, 238, 0.45);
+
+  /* Accents */
+  --color-primary: #22d3ee; /* Cyan #22d3ee */
+  --color-primary-glow: rgba(34, 211, 238, 0.25);
+  --color-accent: #38bdf8;
+
+  /* Railway Line Palette: UP (Green #10b981), DN (Orange #f97316), 3rd (Purple #a855f7) */
+  --color-line-up: #10b981;
+  --color-line-dn: #f97316;
+  --color-line-third: #a855f7;
+
+  /* Status and Signal only */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.15);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-info: #06b6d4;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 20px rgba(34, 211, 238, 0.3);
+}
+
+.light-theme {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-surface-glass: rgba(255, 255, 255, 0.85);
+  --bg-surface-hover: #e2e8f0;
+
+  --border-subtle: #e2e8f0;
+  --border-card: #cbd5e1;
+  --border-glow: rgba(2, 132, 199, 0.3);
+
+  --color-primary: #0284c7;
+  --color-primary-glow: rgba(2, 132, 199, 0.15);
+  --color-accent: #6366f1;
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+  --shadow-card: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #060913;
+  background-image: 
+    radial-gradient(circle at 18% 22%, rgba(6, 182, 212, 0.20) 0%, transparent 40%),
+    radial-gradient(circle at 82% 16%, rgba(99, 102, 241, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(20, 184, 166, 0.18) 0%, transparent 50%),
+    linear-gradient(180deg, #070b18 0%, #030712 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* App Container Layout */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  background: transparent;
+}
+
+.page-container {
+  padding: 24px;
+  max-width: 1560px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Glass panel utility */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.glass-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.main-content.train-spot-view {
+  overflow: hidden !important;
+}
+
+.carto-dark-tiles {
+  filter: brightness(0.88) contrast(1.1) saturate(0.85);
+}
+
+.spatial-glass {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Navigation TopBar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: rgba(10, 15, 28, 0.75);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.topbar-left, .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Simulation Clock */
+.sim-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.sim-clock-digital {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 1px;
+}
+
+/* Speed Controls */
+.speed-button-group {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.speed-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.speed-btn.active {
+  background: var(--color-primary);
+  color: #0a0f1c;
+  font-weight: 700;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+/* Demo Scenario Button */
+.btn-demo-cta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #06b6d4, #22d3ee);
+  color: #0a0f1c;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-demo-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.6);
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  background: rgba(10, 15, 28, 0.85);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-header {
+  padding: 20px 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-logo-icon {
+  color: var(--color-primary);
+  background: rgba(34, 211, 238, 0.12);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary-glow);
+}
+
+.sidebar-brand-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.sidebar-brand-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+  transform: translateX(2px);
+}
+
+.nav-item.active {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--color-primary);
+  font-weight: 600;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.15);
+}
+
+/* KPI Cards Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.kpi-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.kpi-footer {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Control Room Card Surface */
+.surface-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  margin-bottom: 24px;
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.surface-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.data-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-main);
+}
+
+.data-table tr:hover {
+  background: var(--bg-surface);
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  max-width: 600px;
+  width: 90%;
+  padding: 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #0b0f19;
+}
+
+.btn-primary:hover {
+  background: #7dd3fc;
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-card);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-surface-hover);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* Gantt Timeline Grid */
+.timeline-scroll-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.timeline-header {
+  display: flex;
+  border-bottom: 2px solid var(--border-card);
+  background: var(--bg-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.timeline-platform-label-col {
+  width: 140px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-right: 2px solid var(--border-card);
+  background: var(--bg-secondary);
+}
+
+.timeline-time-slots {
+  display: flex;
+  flex: 1;
+}
+
+.timeline-slot {
+  width: 80px;
+  flex-shrink: 0;
+  padding: 10px 4px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border-right: 1px dashed var(--border-subtle);
+}
+
+.timeline-row {
+  display: flex;
+  height: 52px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+.timeline-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 6px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.timeline-bar:hover {
+  transform: translateY(-2px) scale(1.02);
+  z-index: 20;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-card);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ==========================================================================
+   Leaflet Geographic Operations Map Styling
+   ========================================================================== */
+
+.leaflet-container {
+  font-family: var(--font-sans);
+  background-color: #0b0f19 !important;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.light-theme .leaflet-container {
+  background-color: #f1f5f9 !important;
+}
+
+/* Custom dark styled popups */
+.leaflet-popup-content-wrapper {
+  background: var(--bg-surface) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-card) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+}
+
+.light-theme .leaflet-popup-content-wrapper {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-popup-tip {
+  background: var(--bg-surface) !important;
+}
+
+.light-theme .leaflet-popup-tip {
+  background: #ffffff !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+  line-height: 1.4 !important;
+}
+
+/* Custom dark tooltips */
+.leaflet-tooltip {
+  background: var(--bg-surface) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-card) !important;
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.72rem !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  padding: 3px 7px !important;
+}
+
+.light-theme .leaflet-tooltip {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Pulse animation for waiting trains and red signals */
+@keyframes train-danger-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.pulse-danger {
+  animation: train-danger-pulse 1.8s infinite;
+}
+
+@keyframes train-special-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.pulse-special {
+  animation: train-special-pulse 1.6s infinite;
+}
+
+/* ==========================================================================
+   Spatial UI + Subtle Glassmorphism Operation System
+   ========================================================================== */
+
+.spatial-canvas {
+  background-color: #070a12;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.05) 0%, transparent 40%),
+    linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+}
+
+.light-theme .spatial-canvas {
+  background-color: #f1f5f9;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.06) 0%, transparent 50%),
+    linear-gradient(rgba(2, 132, 199, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 132, 199, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+}
+
+.spatial-glass {
+  background: rgba(10, 15, 28, 0.72) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-radius: 16px !important;
+  color: #e5edf7 !important;
+  font-size: 12px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.light-theme .spatial-glass {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  box-shadow: 0 10px 25px -8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.spatial-pill {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--radius-full);
+}
+
+.spatial-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.25);
+}
+
+/* Subtle Glow on Railway Tracks */
+.track-glow-up {
+  filter: drop-shadow(0 0 2px rgba(52, 211, 153, 0.5));
+}
+
+.track-glow-dn {
+  filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.5));
+}
+
+.track-ahead-highlight {
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.8));
+}
+
+/* Soft Motion Glide Pulse for Moving Trains */
+@keyframes train-glide-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.75;
+  }
+  65% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+.train-moving-pulse {
+  animation: train-glide-pulse 2.2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+/* Railway Track Bed with Sleepers */
+.railway-track-bed {
+  position: relative;
+  height: 28px;
+  background: linear-gradient(180deg, #101626 0%, #0b0f19 100%);
+  border-radius: 6px;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.railway-track-bed::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08) 0px,
+    rgba(255, 255, 255, 0.08) 3px,
+    transparent 3px,
+    transparent 14px
+  );
+  pointer-events: none;
+}
+
+.railway-track-bed::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  border-top: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-bottom: 1.5px solid rgba(148, 163, 184, 0.25);
+  pointer-events: none;
+}
+
+/* Train Track Marker with Real Smooth Movement */
+.track-train-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 1.4s linear;
+  z-index: 20;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.track-train-marker:hover {
+  z-index: 30;
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+/* Glow indicators */
+.glow-success {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.glow-danger {
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+}
+
+.glow-primary {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+}
+
+
