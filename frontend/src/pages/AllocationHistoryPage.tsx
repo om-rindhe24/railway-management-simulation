@@ -21,9 +21,12 @@ export const AllocationHistoryPage: React.FC<AllocationHistoryPageProps> = ({
   const getChangeTypeBadge = (type: string) => {
     switch (type) {
       case 'DYNAMIC_REALLOCATION':
+      case 'TRAIN_REALLOCATED':
         return <span className="badge badge-warning">REALLOCATION</span>;
       case 'PLATFORM_CLOSURE':
         return <span className="badge badge-danger">PLATFORM CLOSURE</span>;
+      case 'TRAIN_HELD':
+        return <span className="badge badge-danger" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid #ef4444' }}>TRAIN HELD</span>;
       default:
         return <span className="badge badge-success">INITIAL ALLOCATION</span>;
     }
@@ -56,7 +59,9 @@ export const AllocationHistoryPage: React.FC<AllocationHistoryPageProps> = ({
           >
             <option value="ALL">All Event Types</option>
             <option value="DYNAMIC_REALLOCATION">Dynamic Reallocations</option>
+            <option value="TRAIN_REALLOCATED">Train Reallocated</option>
             <option value="PLATFORM_CLOSURE">Platform Closures</option>
+            <option value="TRAIN_HELD">Train Held</option>
             <option value="INITIAL_ALLOCATION">Initial Allocations</option>
           </select>
         </div>
@@ -100,9 +105,15 @@ export const AllocationHistoryPage: React.FC<AllocationHistoryPageProps> = ({
                         {entry.fromPlatformNumber ? `P${entry.fromPlatformNumber}` : 'Timetable'}
                       </span>
                       <ArrowRight size={14} color="var(--color-primary)" />
-                      <span style={{ color: 'var(--color-primary)', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
-                        P{entry.toPlatformNumber}
-                      </span>
+                      {entry.toPlatformNumber ? (
+                        <span style={{ color: 'var(--color-primary)', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
+                          P{entry.toPlatformNumber}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
+                          HELD
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>{getChangeTypeBadge(entry.changeType)}</td>

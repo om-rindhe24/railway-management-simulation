@@ -195,8 +195,22 @@ public class AllocationService {
                 allAllocations
         );
 
+        // Record platform closure event in audit history
+        historyRepository.save(new AllocationHistory(
+                "SYSTEM",
+                "Platform Closure Event",
+                stationCode,
+                platform.getPlatformNumber(),
+                null,
+                ChangeType.PLATFORM_CLOSURE,
+                String.format("Platform %d closed at %s: %s. %d affected train(s) re-evaluated.",
+                        platform.getPlatformNumber(), stationCode, reason, result.getReallocatedCount()),
+                0,
+                result.getReallocatedCount()
+        ));
+
         // Apply reallocation results to DB
-        applyReallocationDecisions(result.getReallocationDecisions(), stationCode, ChangeType.PLATFORM_CLOSURE);
+        applyReallocationDecisions(result.getReallocationDecisions(), stationCode, ChangeType.TRAIN_REALLOCATED);
 
         // Secondary synchronization: reallocated trains receive new platform signals, resume if permissive
         if (simulationService != null) {
@@ -316,15 +330,20 @@ public class AllocationService {
                 );
                 allocationRepository.save(newAlloc);
 
+                String explicitReason = buildExplicitReallocationReason(train, oldPlatform, dec, stationCode);
+
                 // Record in audit log (AllocationHistory)
+                ChangeType recordType = (changeType == ChangeType.PLATFORM_CLOSURE || changeType == ChangeType.DYNAMIC_REALLOCATION)
+                        ? ChangeType.TRAIN_REALLOCATED : changeType;
+
                 historyRepository.save(new AllocationHistory(
                         train.getTrainNumber(),
                         train.getTrainName(),
                         stationCode,
                         oldPlatform,
                         dec.getSelectedPlatformNumber(),
-                        changeType,
-                        dec.getPrimaryReason() + " | " + dec.getDetailedBreakdown(),
+                        recordType,
+                        explicitReason,
                         dec.getEstimatedDelayMinutes(),
                         1
                 ));
@@ -333,9 +352,7 @@ public class AllocationService {
                 eventRepository.save(new SimulationEvent(
                         "TRAIN_REALLOCATED",
                         Severity.WARNING,
-                        String.format("Reallocated %s from %s P%s to P%s: %s",
-                                train.getTrainNumber(), stationCode, oldPlatform != null ? oldPlatform : "?",
-                                dec.getSelectedPlatformNumber(), dec.getPrimaryReason()),
+                        explicitReason,
                         train.getTrainNumber(),
                         dec.getSelectedPlatformNumber(),
                         stationCode
@@ -346,19 +363,84 @@ public class AllocationService {
                 train.setSignalAspect(SignalAspect.RED);
                 String homeSigId = (stationCode != null && oldPlatform != null) ? "SIG-" + stationCode.toUpperCase() + "-P" + oldPlatform : "SIG-AUTO";
                 train.setNextSignalId(homeSigId);
-                String waitMsg = String.format("Held at home signal %s: No alternative platform available after platform %d closed.", homeSigId, oldPlatform != null ? oldPlatform : 0);
+                String waitMsg = String.format("%s held: Allocated platform %d is closed and no alternative platform available",
+                        train.getTrainNumber(), oldPlatform != null ? oldPlatform : 0);
                 train.setWaitingReason(waitMsg);
                 trainRepository.save(train);
 
+                // Record in audit log (AllocationHistory) for UI visibility
+                historyRepository.save(new AllocationHistory(
+                        train.getTrainNumber(),
+                        train.getTrainName(),
+                        stationCode,
+                        oldPlatform,
+                        null,
+                        ChangeType.TRAIN_HELD,
+                        waitMsg,
+                        15,
+                        0
+                ));
+
+                // Record in simulation event log (SimulationEvent)
                 eventRepository.save(new SimulationEvent(
                         "TRAIN_HELD",
                         Severity.WARNING,
-                        String.format("Train %s HELD at %s home signal %s: no compatible open platform after P%s closed",
-                                train.getTrainNumber(), stationCode, homeSigId, oldPlatform != null ? oldPlatform : "?"),
+                        waitMsg,
                         train.getTrainNumber(),
                         oldPlatform,
                         stationCode
                 ));
+            }
+        }
+    }
+
+    private String buildExplicitReallocationReason(Train train, Integer oldPlatform, AllocationDecision dec, String stationCode) {
+        if (!dec.isAllocated()) {
+            return String.format("Held at home signal: No alternative platform available after platform %s closed.",
+                    oldPlatform != null ? oldPlatform : "?");
+        }
+
+        int newPlatform = dec.getSelectedPlatformNumber();
+        LineType newLine = com.railway.simulator.config.PlatformLineConfig.getPlatformLineType(stationCode, newPlatform);
+        String dir = train.getDirection() != null ? train.getDirection().toUpperCase() : "UP";
+
+        boolean isFast = (train.getTrainCategory() == TrainCategory.FAST_LOCAL
+                || train.getTrainType() == TrainType.SPECIAL
+                || train.getTrainType() == TrainType.PREMIUM
+                || train.getTrainType() == TrainType.SUPERFAST
+                || train.getTrainType() == TrainType.EXPRESS_MAIL);
+
+        LineType preferredLine = "UP".equals(dir)
+                ? (isFast ? LineType.FAST_UP : LineType.SLOW_UP)
+                : (isFast ? LineType.FAST_DOWN : LineType.SLOW_DOWN);
+
+        if (newLine == preferredLine) {
+            if (oldPlatform != null && !oldPlatform.equals(newPlatform)) {
+                return String.format("P%d closed; reallocated to P%d (%s, same line and direction)",
+                        oldPlatform, newPlatform, newLine);
+            }
+            return String.format("Assigned to P%d (%s, optimal line match)", newPlatform, newLine);
+        } else {
+            // Fell back to a different line type in the same direction
+            String sameLineStatus = null;
+            if (dec.getCandidateScores() != null) {
+                for (com.railway.simulator.algorithm.dto.PlatformScoreResult score : dec.getCandidateScores()) {
+                    LineType candLine = com.railway.simulator.config.PlatformLineConfig.getPlatformLineType(stationCode, score.getPlatformNumber());
+                    if (candLine == preferredLine && (oldPlatform == null || !oldPlatform.equals(score.getPlatformNumber()))) {
+                        sameLineStatus = String.format("P%d (same line) occupied", score.getPlatformNumber());
+                        break;
+                    }
+                }
+            }
+            if (sameLineStatus == null) {
+                sameLineStatus = "same line occupied";
+            }
+            if (oldPlatform != null) {
+                return String.format("P%d closed; %s; fell back to P%d (%s, same direction)",
+                        oldPlatform, sameLineStatus, newPlatform, newLine);
+            } else {
+                return String.format("%s; fell back to P%d (%s, same direction)",
+                        sameLineStatus, newPlatform, newLine);
             }
         }
     }

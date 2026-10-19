@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface SimulationEventRepository extends JpaRepository<SimulationEvent, Long> {
     List<SimulationEvent> findTop50ByOrderByTimestampDesc();
+    List<SimulationEvent> findAllByOrderByTimestampDesc();
 }

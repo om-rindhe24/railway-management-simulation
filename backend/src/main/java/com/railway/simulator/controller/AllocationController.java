@@ -5,6 +5,8 @@ import com.railway.simulator.algorithm.dto.ConflictReport;
 import com.railway.simulator.controller.dto.ApiResponse;
 import com.railway.simulator.domain.AllocationHistory;
 import com.railway.simulator.domain.PlatformAllocation;
+import com.railway.simulator.domain.SimulationEvent;
+import com.railway.simulator.repository.SimulationEventRepository;
 import com.railway.simulator.service.AllocationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +18,11 @@ import java.util.List;
 public class AllocationController {
 
     private final AllocationService allocationService;
+    private final SimulationEventRepository simulationEventRepository;
 
-    public AllocationController(AllocationService allocationService) {
+    public AllocationController(AllocationService allocationService, SimulationEventRepository simulationEventRepository) {
         this.allocationService = allocationService;
+        this.simulationEventRepository = simulationEventRepository;
     }
 
     @GetMapping("/allocations")
@@ -47,5 +51,19 @@ public class AllocationController {
             @RequestParam(required = false) String stationCode) {
         List<AllocationHistory> history = allocationService.getAllocationHistory(stationCode);
         return ResponseEntity.ok(ApiResponse.ok("Retrieved allocation history", history));
+    }
+
+    @GetMapping({"/events", "/audit/events"})
+    public ResponseEntity<ApiResponse<List<SimulationEvent>>> getEvents(
+            @RequestParam(required = false) String stationCode,
+            @RequestParam(required = false) String eventType) {
+        List<SimulationEvent> events = simulationEventRepository.findTop50ByOrderByTimestampDesc();
+        if (stationCode != null && !stationCode.isBlank()) {
+            events = events.stream().filter(e -> stationCode.equalsIgnoreCase(e.getStationCode())).toList();
+        }
+        if (eventType != null && !eventType.isBlank()) {
+            events = events.stream().filter(e -> eventType.equalsIgnoreCase(e.getEventType())).toList();
+        }
+        return ResponseEntity.ok(ApiResponse.ok("Retrieved simulation events", events));
     }
 }

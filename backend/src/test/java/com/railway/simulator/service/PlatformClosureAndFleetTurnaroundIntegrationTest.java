@@ -85,13 +85,20 @@ public class PlatformClosureAndFleetTurnaroundIntegrationTest {
         assertEquals("SIG-BVI-P7", updated.getNextSignalId());
         assertEquals(SignalAspect.GREEN, updated.getSignalAspect());
 
-        // Check audit entry in AllocationHistory or SimulationEvents
+        // Check audit entry in AllocationHistory and SimulationEvents
         List<SimulationEvent> events = eventRepository.findAll();
         boolean hasReallocEvent = events.stream().anyMatch(e ->
                 "TRAIN_REALLOCATED".equals(e.getEventType()) &&
                 "SIM-LOC-901".equals(e.getAffectedTrainNumber()) &&
                 Integer.valueOf(7).equals(e.getAffectedPlatformNumber()));
         assertTrue(hasReallocEvent, "Must log TRAIN_REALLOCATED event with from-platform and to-platform");
+
+        List<AllocationHistory> hist = historyRepository.findAll();
+        boolean hasReallocHist = hist.stream().anyMatch(h ->
+                h.getChangeType() == ChangeType.TRAIN_REALLOCATED &&
+                "SIM-LOC-901".equals(h.getTrainNumber()) &&
+                Integer.valueOf(7).equals(h.getToPlatformNumber()));
+        assertTrue(hasReallocHist, "Must log TRAIN_REALLOCATED in AllocationHistory table for UI audit log");
 
         // Now test fallback to another line type if ALL FAST_UP platforms are closed
         allocationService.handlePlatformClosure(p7.getPlatformId(), "Maintenance on P7 as well");
@@ -132,11 +139,17 @@ public class PlatformClosureAndFleetTurnaroundIntegrationTest {
         assertEquals(SignalAspect.RED, heldTrain.getSignalAspect(), "Signal aspect must be RED");
         assertNotNull(heldTrain.getWaitingReason());
 
-        // Verify TRAIN_HELD audit entry
+        // Verify TRAIN_HELD audit entry in SimulationEvents and AllocationHistory
         List<SimulationEvent> events = eventRepository.findAll();
         boolean hasHeldEvent = events.stream().anyMatch(e ->
                 "TRAIN_HELD".equals(e.getEventType()) && "SIM-LOC-901".equals(e.getAffectedTrainNumber()));
         assertTrue(hasHeldEvent, "Must log TRAIN_HELD event when train is held");
+
+        List<AllocationHistory> heldHist = historyRepository.findAll();
+        boolean hasHeldHist = heldHist.stream().anyMatch(h ->
+                h.getChangeType() == ChangeType.TRAIN_HELD &&
+                "SIM-LOC-901".equals(h.getTrainNumber()));
+        assertTrue(hasHeldHist, "Must log TRAIN_HELD in AllocationHistory table for UI audit log");
 
         // Reopen Platform 5
         Platform p5 = platformRepository.findByStationCodeAndPlatformNumber("BVI", 5).orElseThrow();
@@ -385,6 +398,78 @@ public class PlatformClosureAndFleetTurnaroundIntegrationTest {
                 platformService.openPlatform(pId);
                 trainRepository.delete(testTrain);
             }
+        }
+    }
+
+    @Test
+    @DisplayName("Verify explicit reallocation reason and persistence of TRAIN_REALLOCATED and TRAIN_HELD in AllocationHistory and SimulationEvents")
+    void testExplicitReasonAndAuditPersistence_BVI_P1_Closure() {
+        Platform p1 = platformRepository.findByStationCodeAndPlatformNumber("BVI", 1).orElseThrow();
+        Train train = new Train("SIM-TEST-P1", "Test Slow Local", TrainType.LOCAL, "VR", "CCG", 5,
+                LocalDateTime.of(2026, 9, 18, 10, 5), LocalDateTime.of(2026, 9, 18, 10, 10), "BVI", "CCG");
+        train.setDirection("UP");
+        train.setTrainCategory(TrainCategory.SLOW_LOCAL);
+        train.setTargetStationCode("BVI");
+        train.setAssignedPlatformId(p1.getPlatformId());
+        train.setAssignedPlatformNumber(1);
+        train.setStatus(TrainStatus.APPROACHING);
+        train.setCurrentBlockId("BLK-DIC-BVI-SU");
+        train.setIsActive(true);
+        train = trainRepository.save(train);
+
+        try {
+            // Close Platform 1
+            allocationService.handlePlatformClosure(p1.getPlatformId(), "Defective track switch at P1");
+
+            Train reallocated = trainRepository.findById(train.getTrainId()).orElseThrow();
+            assertEquals(7, reallocated.getAssignedPlatformNumber(), "P1 closed, P2 occupied by SIM-LOC-904 -> must fall back to P7");
+
+            // Verify TRAIN_REALLOCATED in AllocationHistory
+            List<AllocationHistory> histList = historyRepository.findByStationCodeOrderByTimestampDesc("BVI");
+            Optional<AllocationHistory> reallocEntry = histList.stream()
+                    .filter(h -> "SIM-TEST-P1".equals(h.getTrainNumber()) && h.getChangeType() == ChangeType.TRAIN_REALLOCATED)
+                    .findFirst();
+            assertTrue(reallocEntry.isPresent(), "Must write TRAIN_REALLOCATED record in AllocationHistory");
+            assertEquals(1, reallocEntry.get().getFromPlatformNumber());
+            assertEquals(7, reallocEntry.get().getToPlatformNumber());
+            assertTrue(reallocEntry.get().getReason().contains("P1 closed; P2 (same line) occupied; fell back to P7 (FAST_UP, same direction)"),
+                    "Reason must be explicit: " + reallocEntry.get().getReason());
+
+            // Verify TRAIN_REALLOCATED in SimulationEvent
+            List<SimulationEvent> eventList = eventRepository.findAll();
+            assertTrue(eventList.stream().anyMatch(e -> "TRAIN_REALLOCATED".equals(e.getEventType())
+                    && "SIM-TEST-P1".equals(e.getAffectedTrainNumber())
+                    && Integer.valueOf(7).equals(e.getAffectedPlatformNumber())));
+
+            // Now close all remaining UP platforms (P2, P5, P7)
+            for (int pNum : List.of(2, 5)) {
+                Platform p = platformRepository.findByStationCodeAndPlatformNumber("BVI", pNum).orElseThrow();
+                platformService.closePlatform(p.getPlatformId(), "Maintenance");
+            }
+            Platform p7 = platformRepository.findByStationCodeAndPlatformNumber("BVI", 7).orElseThrow();
+            allocationService.handlePlatformClosure(p7.getPlatformId(), "All UP platforms closed");
+
+            Train held = trainRepository.findById(train.getTrainId()).orElseThrow();
+            assertEquals(TrainStatus.WAITING, held.getStatus());
+
+            // Verify TRAIN_HELD in AllocationHistory
+            List<AllocationHistory> heldHistList = historyRepository.findByStationCodeOrderByTimestampDesc("BVI");
+            Optional<AllocationHistory> heldEntry = heldHistList.stream()
+                    .filter(h -> "SIM-TEST-P1".equals(h.getTrainNumber()) && h.getChangeType() == ChangeType.TRAIN_HELD)
+                    .findFirst();
+            assertTrue(heldEntry.isPresent(), "Must write TRAIN_HELD record in AllocationHistory");
+            assertNull(heldEntry.get().getToPlatformNumber());
+
+            // Verify TRAIN_HELD in SimulationEvent
+            assertTrue(eventRepository.findAll().stream().anyMatch(e -> "TRAIN_HELD".equals(e.getEventType())
+                    && "SIM-TEST-P1".equals(e.getAffectedTrainNumber())));
+
+        } finally {
+            for (int pNum : List.of(1, 2, 5, 7)) {
+                platformRepository.findByStationCodeAndPlatformNumber("BVI", pNum)
+                        .ifPresent(p -> platformService.openPlatform(p.getPlatformId()));
+            }
+            trainRepository.delete(train);
         }
     }
 }

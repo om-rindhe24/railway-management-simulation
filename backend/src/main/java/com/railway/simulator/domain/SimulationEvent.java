@@ -114,6 +114,10 @@ public class SimulationEvent {
         return affectedStationCode;
     }
 
+    public String getStationCode() {
+        return affectedStationCode;
+    }
+
     public void setAffectedStationCode(String affectedStationCode) {
         this.affectedStationCode = affectedStationCode;
     }

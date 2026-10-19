@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS allocation_history (
     train_name VARCHAR(100) NOT NULL,
     station_code VARCHAR(10) NOT NULL,
     from_platform_number INT,
-    to_platform_number INT NOT NULL,
+    to_platform_number INT,
     change_type VARCHAR(30) NOT NULL,
     timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reason TEXT NOT NULL,

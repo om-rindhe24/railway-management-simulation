@@ -31,7 +31,7 @@ public class AllocationHistory {
     @Column(name = "from_platform_number")
     private Integer fromPlatformNumber;
 
-    @Column(name = "to_platform_number", nullable = false)
+    @Column(name = "to_platform_number", nullable = true)
     private Integer toPlatformNumber;
 
     @Enumerated(EnumType.STRING)
