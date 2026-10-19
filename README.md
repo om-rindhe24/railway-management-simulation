@@ -1,130 +1,186 @@
-# Dynamic Railway Platform Allocation & Train Scheduling Simulator
+# Railway Management & Simulation System
 
-A high-performance, algorithm-driven railway platform allocation and train scheduling simulator modeled on the Mumbai suburban Western Railway corridor from **Virar to Mumbai Central** (24 stations).
+[![CI Build Status](https://github.com/om-rindhe24/railway-management-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/om-rindhe24/railway-management-simulation/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org)
 
-This project demonstrates the practical application of core Computer Science Data Structures & Algorithms (**Min-Heap Priority Queues**, **Corridor Adjacency Graphs**, **Interval Overlap Conflict Detection**, **Greedy Platform Scoring**, and **Dynamic Cascading Reallocation**) within a production-grade **Spring Boot 3** and **React + TypeScript** control-room application.
-
----
-
-## 1. Problem Statement
-
-Railway platform allocation is a complex scheduling challenge. In busy suburban corridors handling hundreds of train movements daily, unexpected operational perturbations—such as signal delays, platform maintenance closures, or emergency relief train insertions—trigger cascading schedule conflicts. 
-
-The core algorithmic challenge is:
-> **Dynamically generate feasible, conflict-free platform assignments while prioritizing emergency and premium services, optimizing line alignment, and minimizing passenger disruption across platforms.**
+> A real-time, algorithmic railway traffic dispatch, platform allocation, and 4-aspect automatic signalling simulator modeling Mumbai's 24-station Western Railway corridor.
 
 ---
 
-## 2. Core Algorithmic Architecture & DSA Foundation
+## Screenshots
 
-The system separates algorithmic decision-making into an independent, pure Java engine (`com.railway.simulator.algorithm`) accompanied by a comprehensive JUnit 5 test suite verifying structural invariants:
-
-### 1. Min-Heap Priority Queue (`TrainPriorityQueue`)
-* **Purpose**: Manages upcoming train arrivals and configurable simulation priority ordering.
-* **Comparator Invariant**: Composite ordering on:
-  $$\text{Key} = (\text{Simulation Priority Tier}, \text{Effective Arrival Time}, \text{Train Number})$$
-* **Complexity**: Insertion $O(\log N)$ | Removal $O(\log N)$ | Peek $O(1)$ | Space $O(N)$.
-* **Configurable Simulation Priority Policy with six configurable priority tiers**:
-  *(Note: The ordering below is used internally for demonstration and must NEVER be described as official Indian Railways priority)*
-  * Tier 1: Emergency / Special Service
-  * Tier 2: Premium (Rajdhani/Shatabdi simulated service)
-  * Tier 3: Superfast Express
-  * Tier 4: Express / Mail
-  * Tier 5: Suburban Local
-  * Tier 6: Freight / Goods
-
-### 2. Corridor Network Graph (`CorridorGraph`)
-* **Purpose**: Models the 24-station Western Railway corridor from Virar to Mumbai Central, separating Fast Line and Slow Line track connectivity.
-* **Data Structure**: Adjacency list graph with weighted directed edges representing physical tracks.
-* **Complexity**: Station lookup $O(1)$ | Route validation $O(V + E)$ | Shortest path $O(V + E \log V)$.
-
-### 3. Interval Overlap Conflict Detector (`IntervalConflictDetector`)
-* **Purpose**: Determines whether two trains collide on the same platform within safety buffers.
-* **Interval Model**: $[T_{\text{arr}} - \Delta_{\text{buffer}}, T_{\text{dep}} + \Delta_{\text{buffer}}]$ (default $\Delta = 3\text{ minutes}$).
-* **Condition**: Two intervals $[s_1, e_1]$ and $[s_2, e_2]$ conflict on platform $P$ if and only if:
-  $$\max(s_1, s_2) < \min(e_1, e_2)$$
-* **Complexity**: Pairwise check $O(1)$ | Platform check $O(M)$ | Global sweep $O(T \log T)$.
-
-### 4. Explainable Multi-Factor Platform Scoring Engine (`PlatformScoringEngine`)
-* **Purpose**: Evaluates candidate platforms for a train without arbitrary magic numbers.
-* **Mathematical Factors**:
-  * **Hard Gates**: Platform must be open, compatible with train type, and conflict-free.
-  * **Line Match**: $+50$ pts for dedicated line alignment (Fast platform for express, Slow platform for local).
-  * **Idle Spacing Buffer**: $+25 \times \min(1.0, \frac{\text{gap}}{20\text{ min}})$ to prevent bottleneck bunching.
-  * **Passenger Disruption Minimization**: $+40$ pts for published timetable platform; $-8 \times |\text{Candidate} - \text{Scheduled}|$ walking distance penalty.
-  * **Priority Bonus**: $+3 \times (7 - \text{Tier})$.
-
-### 5. Dynamic Cascading Reallocation Engine (`DynamicReallocationEngine`)
-* **Purpose**: Triggered when a platform is closed or a train is delayed. Evicts affected trains, re-queues them into the Min-Heap by priority, and algorithmically reassigns them to the best available conflict-free platforms while logging a full audit trail.
+| Live Train Spotter (Map View) | Borivali (BVI) Station Interlocking |
+| :---: | :---: |
+| ![Live Corridor Map](docs/screenshots/live_map.png) | ![Borivali Zoom View](docs/screenshots/bvi_zoom.png) |
+| **Schematic Corridor Track View** | **Platform Allocation & Live Closure View** |
+| ![Schematic Corridor View](docs/screenshots/schematic_view.png) | ![Platform View](docs/screenshots/platform_view.png) |
 
 ---
 
-## 3. Technology Stack
+## Key Features
 
-* **Backend**: Java 21+, Spring Boot 3.3.4, Spring Data JPA, Spring Web, Bean Validation, JUnit 5.
-* **Database**: Dual-profile persistence:
-  * **H2 Embedded (Default)**: In-memory mode for zero-friction evaluation and automated test runs.
-  * **MySQL 8.0 (Production Profile: `mysql`)**: Configured via externalized environment variables (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`).
-* **Frontend**: React 19, TypeScript, Vite, Vanilla CSS Design System, Lucide Icons.
-* **Architecture**: Layered Hexagonal-inspired Architecture with pure POJO algorithmic core.
-
----
-
-## 4. Key Features & Dashboard Views
-
-1. **Operations Dashboard Overview**: High-level KPIs (Active Trains, Available Platforms, Delayed Trains, Utilization %, Conflicts Prevented), live approaching train feed, and quick trigger actions.
-2. **Platform Occupancy View**: Real-time grid of all station platforms with occupancy badges and a **1-click Platform Closure Simulator** that immediately runs dynamic reallocation.
-3. **Occupancy Timeline (Gantt Interval View)**: Interactive timeline displaying platform lanes vs. time intervals, color-coded train bars, safety buffers, and a live simulation clock needle.
-4. **Corridor Schematic Network Map**: 24-station topological visualizer from Virar to Mumbai Central showing parallel Fast/Slow tracks and train locations.
-5. **What-If Operations Studio**: Perturbation testing lab allowing delay injections and platform shutdowns with real-time impact delta analysis.
-6. **DSA Algorithm Lab & Viva Panel**: Dedicated technical defense view showcasing Priority Queues, Corridor Graphs, Interval Conflict Detection, and Platform Scoring with complexities and interview talking points.
-7. **Train & Fleet Management**: Search, filter by category/status, add new train modal, and inline delay adjustments.
-8. **Allocation & Reallocation Audit Log**: Immutable timestamped history recording previous platform, new platform, algorithmic reasoning, and delay deltas.
-9. **1-Click "Run Demo Scenario"**: Automated guided walkthrough designed specifically for evaluation presentations.
+- **Algorithmic Platform Allocation & Scoring**: Dynamic multi-criteria scoring algorithm assigns platforms based on length, physical line compatibility, occupancy buffer windows, and crossover penalty weights.
+- **Dynamic Reallocation & Interlocking**: Automatic real-time failover when a platform is closed for maintenance or emergencies. Enforces strict direction preservation (UP trains remain on UP/COMMON platforms; DOWN trains remain on DOWN/COMMON platforms) and falls back to compatible lines (Slow to Fast) or holds trains safely at outer home signals.
+- **Comprehensive Audit Trail**: Automatically records granular operational logs (`TRAIN_REALLOCATED` with explicit fallback reasoning, `TRAIN_HELD`, `PLATFORM_CLOSURE`, `PLATFORM_REOPENED`) persisted in relational storage and inspectable via the API.
+- **Indian Railways 4-Aspect Signalling**: Realistic multi-block signalling logic (`GREEN`, `DOUBLE_YELLOW`, `YELLOW`, `RED`) regulating acceleration, caution approach speeds, and mandatory signal halts.
+- **Physics-Informed Speed & Braking Curves**: Trains accelerate smoothly up to corridor track speed limits and brake realistically based on aspect visibility and platform approach limits.
+- **Service Stopping Patterns**: Differentiated route handling for `SLOW_LOCAL` (all stops), `FAST_LOCAL` (skips minor halts), and `EXPRESS` / `EMERGENCY` mainline services.
+- **24-Station Virar – Mumbai Central Corridor**: High-density quad-track topology (SLOW_UP, SLOW_DOWN, FAST_UP, FAST_DOWN) with intermediate signals, platform track circuits, and crossovers.
+- **Turnaround Loop Execution**: Automated terminal train inversion at Virar (`VR`) and Mumbai Central (`MMCT`), enabling long-running corridor simulations without fleet depletion.
+- **Interactive Leaflet & Schematic Interfaces**: Synchronized real-time UI featuring a live geographic track map, schematic ladder view, timeline Gantt charts, delay injection sandboxes, and analytical throughput dashboards.
 
 ---
 
-## 5. Getting Started & Execution
+## Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Backend** | Java 21, Spring Boot 3.3.4, Spring Security, Spring Data JPA, Hibernate, H2 Database / MySQL 8.0 |
+| **Frontend** | React 19, TypeScript, Vite, TailwindCSS / Vanilla CSS, Leaflet, Lucide Icons |
+| **Algorithms** | Graph-based Corridor Representation, Dynamic Priority Queues, Interval Conflict Detection, 4-Aspect State Machine |
+| **Testing & CI** | JUnit 5, Mockito, Spring Security Test, Playwright, GitHub Actions |
+
+---
+
+## Architecture & Algorithm Overview
+
+For detailed diagrams and architectural specifications, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+```
+                      +-----------------------------+
+                      |      CorridorGraph          |
+                      |  24 Stations | 4 Track Lines|
+                      +--------------+--------------+
+                                     |
+               +---------------------+---------------------+
+               |                                           |
+               v                                           v
++-----------------------------+             +-----------------------------+
+|    TrainPriorityQueue       |             |     SignalStateEngine       |
+| Hierarchy & Delay Weighted  |             |  4-Aspect Dynamic Blocks    |
++--------------+--------------+             +--------------+--------------+
+               |                                           |
+               v                                           v
++-----------------------------+             +-----------------------------+
+|   PlatformScoringEngine     |             |  IntervalConflictDetector   |
+| Multi-Criteria Evaluation   |             |   Headway & Space-Time Cloc |
++--------------+--------------+             +-----------------------------+
+               |
+               v
++-----------------------------+
+|  DynamicReallocationEngine  |
+| Failover & Direction Guard  |
++-----------------------------+
+```
+
+1. **`CorridorGraph`**: Models the 24 stations, four running lines, intermediate signal checkpoints, and physical platform lengths.
+2. **`TrainPriorityQueue`**: Evaluates trains by operational urgency: $\text{Priority} = f(\text{Category}, \text{Delay Minutes}, \text{Approaching Distance})$.
+3. **`PlatformScoringEngine`**: Computes multi-attribute utility scores penalizing track switches, occupied headway margins, and incompatible stopping requirements.
+4. **`DynamicReallocationEngine`**: Detects live disruption triggers (platform closures, block blockages), computes alternate feasible allocations, and writes audit history.
+5. **`SignalStateEngine`**: Continuously updates signals every simulation tick based on downstream block reservations and train positions.
+6. **`IntervalConflictDetector`**: Sweeps temporal reservation intervals $[T_{\text{start}}, T_{\text{end}}]$ across platforms to prevent conflicting train movements.
+
+---
+
+## How to Run
 
 ### Prerequisites
-* Java JDK 21 or higher (JDK 24 tested)
-* Apache Maven 3.9+
-* Node.js v20+ and npm
+- **JDK 21** or later
+- **Apache Maven 3.9+**
+- **Node.js 20+** and **npm 10+**
 
-### 1. Run Backend (Spring Boot)
+### 1. Backend Setup
 ```bash
 cd backend
-mvn spring-boot:run
+
+# Run with development profile (H2 in-memory DB + console enabled)
+mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
-* Backend starts at: `http://localhost:8080`
-* H2 Database Web Console: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:railway_db`, User: `sa`, Password: blank)
+The backend initializes on `http://localhost:8080`.
 
-*(Optional: To run with MySQL 8.0, pass `-Dspring.profiles.active=mysql` along with `DB_USERNAME` and `DB_PASSWORD` environment variables).*
-
-### 2. Run Frontend (React + TypeScript)
+### 2. Frontend Setup
 ```bash
 cd frontend
+
+# Install dependencies
 npm install
+
+# Start Vite development server
 npm run dev
 ```
-* Frontend starts at: `http://localhost:5173`
+The frontend application opens on `http://localhost:5173`.
 
-### 3. Run Automated Tests
+### Environment Variables & Credentials
+
+| Variable | Scope | Default (Dev Profile) | Production Recommendation |
+| :--- | :--- | :--- | :--- |
+| `SIMULATOR_API_KEY` | Backend | `railway-dev-key-2026` | Generate high-entropy 64-char hex key |
+| `ADMIN_USERNAME` | Backend | `admin` | Custom administrative username |
+| `ADMIN_PASSWORD` | Backend | `dev-admin-pass` | Secure cryptographic password |
+| `CORS_ALLOWED_ORIGINS` | Backend | `http://localhost:5173` | Trusted production web domain |
+| `VITE_API_KEY` | Frontend | `railway-dev-key-2026` | Matches `SIMULATOR_API_KEY` |
+
+> [!NOTE]
+> All mutating and administrative endpoints (platform close/open, simulation start/speed/reset, train CRUD, delay injection) require authentication via the `X-API-KEY` header or HTTP Basic Auth. Read-only endpoints used for the corridor telemetry and live map remain public.
+
+---
+
+## How to Run Tests
+
+### Backend Unit & Integration Tests
 ```bash
 cd backend
-mvn test
+mvn clean test
 ```
-Executes all 17 unit tests covering Priority Queues, Corridor Graphs, Interval Conflict Detectors, Platform Scoring, and Dynamic Reallocation.
+The suite executes **95 comprehensive tests** verifying algorithm correctness, 4-aspect signal cascades, platform direction invariants, live failover reallocations, and security authorization filters.
+
+### Frontend Validation
+```bash
+cd frontend
+npm run build
+```
 
 ---
 
-## 6. Simulation Assumptions & Disclaimers
+## Main REST API Endpoints
 
-1. **Station Names**: Station names along the Virar to Mumbai Central line correspond to authentic geographical stations on Western Railway.
-2. **Simulation Parameters**: Platform counts, track layouts, line allocations, train schedules, travel times, and priority tiers are **Configurable Simulation Data / Configurable Simulation Assumptions**.
-3. **Non-Affiliation**: This software is an academic simulation and algorithmic decision-support project. It does NOT claim to represent official Indian Railways operating rules, live signalling protocols, or actual railway dispatching decisions.
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/corridor/state` | Public | Full corridor snapshot (trains, blocks, signals, active allocations) |
+| `GET` | `/api/stations` | Public | List all 24 stations along the Virar–Mumbai Central corridor |
+| `GET` | `/api/stations/{code}/platforms`| Public | Fetch platforms, line types, and status for a specific station |
+| `GET` | `/api/history` | Public | Audit log of allocation changes, reallocations, and held trains |
+| `GET` | `/api/analytics` | Public | Corridor KPIs: active fleet count, punctuality rate, headway averages |
+| `GET` | `/actuator/health` | Public | Application health telemetry |
+| `POST`| `/api/simulation/start` | Secured | Start the real-time physics and signalling clock |
+| `POST`| `/api/simulation/pause` | Secured | Pause simulation tick execution |
+| `POST`| `/api/simulation/speed` | Secured | Set simulation time multiplier (1x to 10x) |
+| `POST`| `/api/simulation/reset` | Secured | Reset corridor state and reseed baseline schedule |
+| `POST`| `/api/platforms/{id}/close` | Secured | Close a platform for maintenance with reason |
+| `POST`| `/api/platforms/{id}/open` | Secured | Reopen platform and resume scheduled allocations |
+| `POST`| `/api/trains/{id}/delay` | Secured | Inject simulated signal/operational delay (minutes) |
 
 ---
 
-## 7. License
-Academic and portfolio demonstration project.
+## Honest Limitations
+
+- **Synthetic Timetables & Assumptions**: While station names, sequence orders, and quad-track directions mirror the Western Railway corridor, scheduled timetables, headway intervals, and platform-to-line assignments are simulation models rather than official Indian Railways working time tables (WTT).
+- **Not Production Rail Hardened**: Designed for dispatch research, simulation modeling, and educational demonstration. It is not an SIL-4 certified safety-critical railway interlocking system.
+- **OpenStreetMap Attribution**: Geographic map tiles are rendered using [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, available under the Open Database License (ODbL).
+
+---
+
+## What I Learned
+
+1. **Safety Interlocking Invariants**: Enforcing strict direction preservation (UP vs DOWN) during real-time failovers is critical; a naive scoring algorithm might find an idle opposite-direction platform that would cause a face-to-face deadlock or derailment risk.
+2. **Tick-Based Physics & Discrete Events**: Coordinating continuous kinematics (acceleration, braking distance) with discrete 4-aspect block signals requires deterministic tick loops to prevent trains from overshooting occupied blocks.
+3. **Defense-in-Depth for Dispatchers**: Hardening operational APIs with tokenized authentication, strict bean validation, and masked error traces prevents malicious or malformed disruption triggers in transport dispatch consoles.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) - Copyright (c) 2026 OM Rindhe.
