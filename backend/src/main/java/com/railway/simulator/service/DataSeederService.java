@@ -131,7 +131,7 @@ public class DataSeederService implements CommandLineRunner {
         Object[][] trainData = {
             // [Number, Name, Type, Source, Destination, Priority, ArrDelta, DepDelta, TargetStation, InitialBlock, Progress, Speed, Status, WaitingReason]
             {"SIM-LOC-901", "Simulation Fast Local (VR-CCG)", TrainType.LOCAL, "VR", "CCG", 5, 2, 6, "BVI", "BLK-DIC-BVI-FU", 45.0, 65.0, TrainStatus.APPROACHING, null},
-            {"SIM-LOC-902", "Simulation Slow Local (VR-CCG)", TrainType.LOCAL, "VR", "CCG", 5, 5, 10, "BVI", "BLK-BSR-NIG-SU", 50.0, 50.0, TrainStatus.APPROACHING, null},
+            {"SIM-LOC-902", "Simulation Slow Local (VR-CCG)", TrainType.LOCAL, "VR", "CCG", 5, 5, 10, "BVI", "BLK-DIC-BVI-SU", 50.0, 50.0, TrainStatus.APPROACHING, null},
             {"SIM-VB-20901", "Simulation Vande Bharat Express", TrainType.PREMIUM, "MMCT", "GNC", 2, 8, 14, "BVI", "BLK-AND-JOS-FD", 30.0, 95.0, TrainStatus.APPROACHING, null},
             {"SIM-RAJ-12951", "Simulation Rajdhani Service", TrainType.PREMIUM, "MMCT", "NDLS", 2, 12, 18, "BVI", "BLK-KHR-STC-FD", 60.0, 50.0, TrainStatus.APPROACHING, null},
             {"SIM-SF-12953", "Simulation August Kranti Express", TrainType.SUPERFAST, "MMCT", "NZM", 3, 15, 22, "DDR", "BLK-DDR-P6", 0.0, 0.0, TrainStatus.AT_PLATFORM, null},
