@@ -118,8 +118,9 @@ CREATE TABLE IF NOT EXISTS simulation_events (
     affected_station_code VARCHAR(10)
 );
 
-CREATE INDEX idx_stations_seq ON stations(sequence_order);
-CREATE INDEX idx_platforms_st ON platforms(station_id);
-CREATE INDEX idx_trains_st ON trains(target_station_code, status);
-CREATE INDEX idx_alloc_plat_time ON platform_allocations(platform_id, start_time, end_time);
-CREATE INDEX idx_history_time ON allocation_history(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_stations_seq ON stations(sequence_order);
+CREATE INDEX IF NOT EXISTS idx_platforms_st ON platforms(station_id);
+CREATE INDEX IF NOT EXISTS idx_trains_st ON trains(target_station_code, status);
+CREATE INDEX IF NOT EXISTS idx_alloc_plat_time ON platform_allocations(platform_id, start_time, end_time);
+CREATE INDEX IF NOT EXISTS idx_history_time ON allocation_history(timestamp DESC);
+

@@ -47,7 +47,7 @@ public class SimulationController {
     }
 
     @PostMapping("/speed")
-    public ResponseEntity<ApiResponse<Integer>> setSpeed(@RequestBody SimulationSpeedRequest request) {
+    public ResponseEntity<ApiResponse<Integer>> setSpeed(@jakarta.validation.Valid @RequestBody SimulationSpeedRequest request) {
         simulationService.setSpeed(request.getSpeed());
         return ResponseEntity.ok(ApiResponse.ok("Simulation speed updated", simulationService.getSpeedMultiplier()));
     }

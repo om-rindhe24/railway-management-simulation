@@ -1,6 +1,7 @@
 package com.railway.simulator.controller;
 
 import com.railway.simulator.controller.dto.ApiResponse;
+import com.railway.simulator.controller.validation.StationValidationUtil;
 import com.railway.simulator.domain.Station;
 import com.railway.simulator.service.StationService;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class StationController {
 
     @GetMapping("/{code}")
     public ResponseEntity<ApiResponse<Station>> getStationByCode(@PathVariable String code) {
+        StationValidationUtil.validateStationCode(code);
         return stationService.getStationByCode(code)
                 .map(s -> ResponseEntity.ok(ApiResponse.ok("Station found", s)))
                 .orElse(ResponseEntity.notFound().build());

@@ -3,9 +3,11 @@ package com.railway.simulator.controller;
 import com.railway.simulator.algorithm.dto.ReallocationResult;
 import com.railway.simulator.controller.dto.ApiResponse;
 import com.railway.simulator.controller.dto.PlatformClosureRequest;
+import com.railway.simulator.controller.validation.StationValidationUtil;
 import com.railway.simulator.domain.Platform;
 import com.railway.simulator.service.AllocationService;
 import com.railway.simulator.service.PlatformService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +28,9 @@ public class PlatformController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<Platform>>> getPlatforms(
             @RequestParam(required = false) String stationCode) {
+        if (stationCode != null && !stationCode.isBlank()) {
+            StationValidationUtil.validateStationCode(stationCode);
+        }
         List<Platform> platforms = (stationCode != null && !stationCode.isBlank())
                 ? platformService.getPlatformsByStation(stationCode)
                 : platformService.getAllPlatforms();
@@ -42,7 +47,7 @@ public class PlatformController {
     @PostMapping("/{id}/close")
     public ResponseEntity<ApiResponse<ReallocationResult>> closePlatform(
             @PathVariable Long id,
-            @RequestBody(required = false) PlatformClosureRequest request) {
+            @Valid @RequestBody(required = false) PlatformClosureRequest request) {
         String reason = (request != null && request.getReason() != null)
                 ? request.getReason()
                 : "Simulated emergency / maintenance closure";

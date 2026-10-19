@@ -3,6 +3,7 @@ package com.railway.simulator.controller;
 import com.railway.simulator.algorithm.dto.ReallocationResult;
 import com.railway.simulator.controller.dto.ApiResponse;
 import com.railway.simulator.controller.dto.TrainDelayRequest;
+import com.railway.simulator.controller.validation.StationValidationUtil;
 import com.railway.simulator.domain.Train;
 import com.railway.simulator.domain.TrainStatus;
 import com.railway.simulator.domain.TrainType;
@@ -35,6 +36,7 @@ public class TrainController {
 
         List<Train> trains;
         if (station != null && !station.isBlank()) {
+            StationValidationUtil.validateStationCode(station);
             trains = trainService.getTrainsByStation(station);
         } else if (type != null) {
             trains = trainService.getTrainsByType(type);
@@ -62,7 +64,7 @@ public class TrainController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<Train>> updateTrain(@PathVariable Long id, @RequestBody Train train) {
+    public ResponseEntity<ApiResponse<Train>> updateTrain(@PathVariable Long id, @Valid @RequestBody Train train) {
         Train updated = trainService.updateTrain(id, train);
         return ResponseEntity.ok(ApiResponse.ok("Train updated", updated));
     }

@@ -26,12 +26,17 @@ public class Train {
     @Column(name = "train_id")
     private Long trainId;
 
+    @jakarta.validation.constraints.NotBlank(message = "Train number must not be blank")
+    @jakarta.validation.constraints.Size(max = 20, message = "Train number must not exceed 20 characters")
     @Column(name = "train_number", nullable = false, unique = true, length = 20)
     private String trainNumber;
 
+    @jakarta.validation.constraints.NotBlank(message = "Train name must not be blank")
+    @jakarta.validation.constraints.Size(max = 100, message = "Train name must not exceed 100 characters")
     @Column(name = "train_name", nullable = false, length = 100)
     private String trainName;
 
+    @jakarta.validation.constraints.NotNull(message = "Train type is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "train_type", nullable = false, length = 30)
     private TrainType trainType = TrainType.LOCAL;
@@ -49,12 +54,16 @@ public class Train {
     @Column(name = "next_stop_station_code", length = 10)
     private String nextStopStationCode;
 
+    @jakarta.validation.constraints.Size(max = 50, message = "Source station must not exceed 50 characters")
     @Column(name = "source_station", nullable = false, length = 50)
     private String sourceStation;
 
+    @jakarta.validation.constraints.Size(max = 50, message = "Destination station must not exceed 50 characters")
     @Column(name = "destination_station", nullable = false, length = 50)
     private String destinationStation;
 
+    @jakarta.validation.constraints.Min(value = 1, message = "Simulation priority must be at least 1")
+    @jakarta.validation.constraints.Max(value = 10, message = "Simulation priority must not exceed 10")
     @Column(name = "simulation_priority", nullable = false)
     private Integer simulationPriority = 5;
 

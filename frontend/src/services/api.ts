@@ -4,13 +4,15 @@ import {
   CorridorStateDto
 } from '../types';
 
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_KEY = import.meta.env.VITE_API_KEY || 'railway-dev-key-2026';
 
 async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      'X-API-KEY': API_KEY,
       ...options?.headers,
     },
     ...options,

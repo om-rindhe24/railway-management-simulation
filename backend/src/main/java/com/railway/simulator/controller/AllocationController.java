@@ -3,6 +3,7 @@ package com.railway.simulator.controller;
 import com.railway.simulator.algorithm.dto.AllocationDecision;
 import com.railway.simulator.algorithm.dto.ConflictReport;
 import com.railway.simulator.controller.dto.ApiResponse;
+import com.railway.simulator.controller.validation.StationValidationUtil;
 import com.railway.simulator.domain.AllocationHistory;
 import com.railway.simulator.domain.PlatformAllocation;
 import com.railway.simulator.domain.SimulationEvent;
@@ -28,6 +29,9 @@ public class AllocationController {
     @GetMapping("/allocations")
     public ResponseEntity<ApiResponse<List<PlatformAllocation>>> getActiveAllocations(
             @RequestParam(required = false) String stationCode) {
+        if (stationCode != null && !stationCode.isBlank()) {
+            StationValidationUtil.validateStationCode(stationCode);
+        }
         List<PlatformAllocation> allocations = allocationService.getActiveAllocations(stationCode);
         return ResponseEntity.ok(ApiResponse.ok("Retrieved active platform allocations", allocations));
     }
@@ -35,6 +39,7 @@ public class AllocationController {
     @PostMapping("/allocations/run")
     public ResponseEntity<ApiResponse<List<AllocationDecision>>> runAllocation(
             @RequestParam(defaultValue = "BVI") String stationCode) {
+        StationValidationUtil.validateStationCode(stationCode);
         List<AllocationDecision> decisions = allocationService.runStationAllocation(stationCode);
         return ResponseEntity.ok(ApiResponse.ok("Batch platform allocation completed for " + stationCode, decisions));
     }
@@ -42,6 +47,7 @@ public class AllocationController {
     @GetMapping("/allocations/conflicts")
     public ResponseEntity<ApiResponse<List<ConflictReport>>> getConflicts(
             @RequestParam(defaultValue = "BVI") String stationCode) {
+        StationValidationUtil.validateStationCode(stationCode);
         List<ConflictReport> conflicts = allocationService.detectActiveConflicts(stationCode);
         return ResponseEntity.ok(ApiResponse.ok("Conflict scan completed", conflicts));
     }
@@ -49,6 +55,9 @@ public class AllocationController {
     @GetMapping("/history")
     public ResponseEntity<ApiResponse<List<AllocationHistory>>> getHistory(
             @RequestParam(required = false) String stationCode) {
+        if (stationCode != null && !stationCode.isBlank()) {
+            StationValidationUtil.validateStationCode(stationCode);
+        }
         List<AllocationHistory> history = allocationService.getAllocationHistory(stationCode);
         return ResponseEntity.ok(ApiResponse.ok("Retrieved allocation history", history));
     }
@@ -57,6 +66,9 @@ public class AllocationController {
     public ResponseEntity<ApiResponse<List<SimulationEvent>>> getEvents(
             @RequestParam(required = false) String stationCode,
             @RequestParam(required = false) String eventType) {
+        if (stationCode != null && !stationCode.isBlank()) {
+            StationValidationUtil.validateStationCode(stationCode);
+        }
         List<SimulationEvent> events = simulationEventRepository.findTop50ByOrderByTimestampDesc();
         if (stationCode != null && !stationCode.isBlank()) {
             events = events.stream().filter(e -> stationCode.equalsIgnoreCase(e.getStationCode())).toList();
