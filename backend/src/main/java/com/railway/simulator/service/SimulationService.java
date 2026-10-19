@@ -134,7 +134,7 @@ public class SimulationService {
         // [blockId, progress, speed, status, waitingReason, src, dest, targetStation]
         Map<String, Object[]> baselineMap = new HashMap<>();
         baselineMap.put("SIM-LOC-901", new Object[]{"BLK-DIC-BVI-FU", 45.0, 65.0, TrainStatus.APPROACHING, null, "VR", "CCG", "BVI"});
-        baselineMap.put("SIM-LOC-902", new Object[]{"BLK-DIC-BVI-SU", 50.0, 50.0, TrainStatus.APPROACHING, null, "VR", "CCG", "BVI"});
+        baselineMap.put("SIM-LOC-902", new Object[]{"BLK-BSR-NIG-SU", 50.0, 50.0, TrainStatus.APPROACHING, null, "VR", "CCG", "BVI"});
         baselineMap.put("SIM-VB-20901", new Object[]{"BLK-AND-JOS-FD", 30.0, 95.0, TrainStatus.APPROACHING, null, "MMCT", "GNC", "BVI"});
         baselineMap.put("SIM-RAJ-12951", new Object[]{"BLK-KHR-STC-FD", 60.0, 50.0, TrainStatus.APPROACHING, null, "MMCT", "NDLS", "BVI"});
         baselineMap.put("SIM-SF-12953", new Object[]{"BLK-DDR-P6", 0.0, 0.0, TrainStatus.AT_PLATFORM, null, "MMCT", "NZM", "DDR"});

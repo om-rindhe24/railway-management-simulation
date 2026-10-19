@@ -135,6 +135,9 @@ public final class PlatformLineConfig {
      * Resolves the direction corresponding to a line type.
      */
     public static String getDirection(LineType lineType) {
+        if (lineType == LineType.COMMON) {
+            return "COMMON";
+        }
         if (lineType == LineType.FAST_UP || lineType == LineType.SLOW_UP) {
             return "UP";
         }
