@@ -1,6 +1,38 @@
-backend/target/
-frontend/node_modules/
-frontend/dist/
+# Build & Dependency Directories
+target/
+**/target/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# Environment Variables & Secrets
+.env*
+!.env.example
+
+# Logs
 *.log
+logs/
+**/logs/
+
+# IDE & Editor Configurations
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+
+# Scratch & Temporary
 scratch*
+**/scratch*
 .system_generated/
