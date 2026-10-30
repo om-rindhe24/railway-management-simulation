@@ -542,7 +542,7 @@ export const LiveTrainSpot: React.FC<LiveTrainSpotProps> = ({
 
       // Hide station label if a train marker overlaps this station
       const isTrainOverlapping = activeTrains.some((t) => {
-        if (t.status === 'AT_PLATFORM' && (t.currentStationCode === station.code || t.currentBlockId?.includes(`-${station.code}-`))) {
+        if (t.status === 'AT_PLATFORM' && (t.currentBlockId?.startsWith(`BLK-${station.code}-P`) || t.currentStationCode === station.code)) {
           return true;
         }
         const calc = trainCalculations.get(t.trainId);

@@ -1145,6 +1145,7 @@ public class SimulationService {
         dto.setStatus(t.getStatus());
         dto.setSourceStation(t.getSourceStation());
         dto.setDestinationStation(t.getDestinationStation());
+        dto.setStationCode(t.getStationCode());
         RouteProgress progress = corridorGraph.computeRouteProgress(t);
         dto.setCurrentStationCode(progress.getLastStationCode());
         dto.setLastStationCode(progress.getLastStationCode());
@@ -1296,10 +1297,27 @@ public class SimulationService {
         List<Train> stationTrains = trainRepository.findByTargetStationCode(p.getStationCode());
         Train waitingTrain = stationTrains.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getIsActive()) && !Objects.equals(t.getTrainId(), p.getCurrentTrainId()))
-                .filter(t -> Objects.equals(t.getAssignedPlatformNumber(), p.getPlatformNumber()))
+                .filter(t -> Objects.equals(t.getAssignedPlatformId(), p.getPlatformId()))
                 .filter(t -> t.getStatus() == TrainStatus.WAITING || t.getStatus() == TrainStatus.APPROACHING)
+                .filter(t -> {
+                    String pDir = p.getDirection();
+                    if (pDir == null || "COMMON".equalsIgnoreCase(pDir)) return true;
+                    return pDir.equalsIgnoreCase(t.getDirection());
+                })
+                .sorted((a, b) -> {
+                    boolean aWait = a.getStatus() == TrainStatus.WAITING;
+                    boolean bWait = b.getStatus() == TrainStatus.WAITING;
+                    if (aWait && !bWait) return -1;
+                    if (!aWait && bWait) return 1;
+                    double progA = a.getProgressPercent() != null ? a.getProgressPercent() : 0.0;
+                    double progB = b.getProgressPercent() != null ? b.getProgressPercent() : 0.0;
+                    return Double.compare(progB, progA);
+                })
                 .findFirst()
                 .orElse(null);
+        if (waitingTrain != null) {
+            dto.setNextWaitingTrainNumber(waitingTrain.getTrainNumber());
+        }
         // Home & Starter Signals
         String homeSigId = "SIG-" + p.getStationCode() + "-P" + p.getPlatformNumber();
         Signal homeSig = signals.get(homeSigId);

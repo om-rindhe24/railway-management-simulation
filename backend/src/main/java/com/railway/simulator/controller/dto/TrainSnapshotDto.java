@@ -18,6 +18,7 @@ public class TrainSnapshotDto {
     private TrainStatus status;
     private String sourceStation;
     private String destinationStation;
+    private String stationCode;
     private String currentStationCode;
     private String lastStationCode;
     private String upcomingStationCode;
@@ -81,6 +82,9 @@ public class TrainSnapshotDto {
 
     public String getDestinationStation() { return destinationStation; }
     public void setDestinationStation(String destinationStation) { this.destinationStation = destinationStation; }
+
+    public String getStationCode() { return stationCode; }
+    public void setStationCode(String stationCode) { this.stationCode = stationCode; }
 
     public String getCurrentStationCode() { return currentStationCode; }
     public void setCurrentStationCode(String currentStationCode) { this.currentStationCode = currentStationCode; }

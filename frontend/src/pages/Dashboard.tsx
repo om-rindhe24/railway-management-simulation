@@ -34,7 +34,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateTab,
   onInjectSampleDelay,
 }) => {
-  const stationTrains = trains.filter((t) => t.targetStationCode === selectedStation);
+  const stationTrains = trains.filter((t) => t.targetStationCode === selectedStation || (t.status === 'AT_PLATFORM' && (t.currentBlockId?.startsWith(`BLK-${selectedStation}-P`) || t.currentStationCode === selectedStation)) || t.upcomingStationCode === selectedStation);
   const occupiedPlatforms = platforms.filter((p) => p.isOccupied).length;
   const closedPlatforms = platforms.filter((p) => p.isClosed).length;
   const availablePlatforms = platforms.length - occupiedPlatforms - closedPlatforms;
@@ -262,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           border: '1px solid var(--border-glow)',
                         }}
                       >
-                        Platform {train.assignedPlatformNumber}
+                        Platform {train.assignedPlatformNumber}{train.targetStationCode && train.targetStationCode !== selectedStation ? ` (${train.targetStationCode})` : ''}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--text-dim)' }}>Unassigned</span>

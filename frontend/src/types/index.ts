@@ -22,6 +22,7 @@ export type TrainStatus =
   | 'DELAYED'
   | 'WAITING'
   | 'WAITING AT STATION'
+  | 'HELD'
   | 'CANCELLED'
   | 'REASSIGNED';
 
@@ -76,6 +77,8 @@ export interface Platform {
 }
 
 export interface Train {
+  direction?: string;
+  progressPercent?: number;
   trainId: number;
   trainNumber: string;
   trainName: string;
@@ -97,6 +100,7 @@ export interface Train {
   currentBlockId?: string;
   nextStationCode?: string;
   targetStationCode: string;
+  stationCode?: string;
   nextStopStationCode?: string;
   stopStations?: string[];
   skipStations?: string[];
@@ -244,6 +248,7 @@ export interface TrainSnapshot {
   upcomingStationCode?: string;
   currentStationDisplay?: string;
   targetStationCode?: string;
+  stationCode?: string;
   nextStopStationCode?: string;
   stopStations?: string[];
   skipStations?: string[];

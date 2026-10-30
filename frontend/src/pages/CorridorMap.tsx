@@ -3,6 +3,7 @@ import { Station, Train, CorridorStateDto, TrainSnapshot, Signal, TrackBlock, Pl
 import { api } from '../services/api';
 import { TrainSignalDrawer } from '../components/TrainSignalDrawer';
 import { formatTrainLocation, formatNextStop } from '../utils/trainFormatters';
+import { getPlatformBerthOccupant, getPlatformWaitingTrains } from '../utils/platformMatching';
 import {
   Train as TrainIcon,
   Navigation,
@@ -661,9 +662,8 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
             const stationDockedTrains = activeTrains.filter(
               (t) =>
                 t.status === 'AT_PLATFORM' &&
-                (t.targetStationCode === station.stationCode ||
-                  t.currentStationCode === station.stationCode ||
-                  (t.currentBlockId && t.currentBlockId.startsWith(`BLK-${station.stationCode}-P`)))
+                (stationPlatforms.some((p) => p.platformId === t.assignedPlatformId) ||
+                 (t.currentBlockId && t.currentBlockId.startsWith(`BLK-${station.stationCode}-P`)))
             );
 
             // Inter-station track blocks between this station and next (UP: station -> nextStation, DN: nextStation -> station)
@@ -837,11 +837,13 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                             <span style={{ fontSize: '0.62rem', fontWeight: 700, color: g.color }}>{g.label}:</span>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                               {g.plats.map((plat) => {
-                                const platColor = plat.closed ? '#ef4444' : plat.occupied ? '#eab308' : '#10b981';
+                                const occupant = getPlatformBerthOccupant(plat, station.stationCode, activeTrains);
+                                const isOcc = Boolean(occupant);
+                                const platColor = plat.closed ? '#ef4444' : isOcc ? '#eab308' : '#10b981';
                                 return (
                                   <span
                                     key={plat.platformId}
-                                    title={`Platform ${plat.platformNumber} (${g.label}): ${plat.closed ? 'CLOSED' : plat.occupied ? 'OCCUPIED' : 'CLEAR'}`}
+                                    title={`Platform ${plat.platformNumber} (${g.label}): ${plat.closed ? 'CLOSED' : isOcc ? 'OCCUPIED' : 'CLEAR'}`}
                                     style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -851,7 +853,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                                       borderRadius: '3px',
                                       background: plat.closed
                                         ? 'rgba(239, 68, 68, 0.2)'
-                                        : plat.occupied
+                                        : isOcc
                                         ? 'rgba(234, 179, 8, 0.2)'
                                         : 'rgba(16, 185, 129, 0.2)',
                                       border: `1px solid ${platColor}`,
@@ -956,21 +958,10 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                         const platStarterSignal = signals.find(
                           (s) => s.signalId === `SIG-${station.stationCode}-P${plat.platformNumber}-STARTER`
                         );
-                        const platTrain = activeTrains.find(
-                          (t) =>
-                            (t.assignedPlatform === plat.platformNumber ||
-                             t.currentBlockId === `BLK-${station.stationCode}-P${plat.platformNumber}`) &&
-                            (t.status === 'AT_PLATFORM' ||
-                              t.status === 'DEPARTED' ||
-                              t.currentStationCode === station.stationCode)
-                        );
-                        const waitingTrain = plat.nextWaitingTrainNumber ||
-                          activeTrains.find(
-                            (t) =>
-                              t.assignedPlatform === plat.platformNumber &&
-                              (t.status === 'WAITING' || t.status === 'APPROACHING') &&
-                              t.trainNumber !== platTrain?.trainNumber
-                          )?.trainNumber;
+                        const platTrain = getPlatformBerthOccupant(plat, station.stationCode, activeTrains);
+                        const isPlatOccupied = Boolean(platTrain);
+                        const waitingTrainsList = getPlatformWaitingTrains(plat, station.stationCode, activeTrains, platTrain?.trainNumber, 1);
+                        const waitingTrain = waitingTrainsList[0]?.trainNumber || null;
 
                         return (
                           <div
@@ -978,13 +969,13 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                             style={{
                               background: plat.closed
                                 ? 'rgba(239, 68, 68, 0.08)'
-                                : plat.occupied
+                                : isPlatOccupied
                                 ? 'rgba(234, 179, 8, 0.08)'
                                 : 'rgba(30, 41, 59, 0.5)',
                               border: `1.5px solid ${
                                 plat.closed
                                   ? '#ef4444'
-                                  : plat.occupied
+                                  : isPlatOccupied
                                   ? 'rgba(234, 179, 8, 0.5)'
                                   : 'rgba(56, 189, 248, 0.15)'
                               }`,
@@ -1029,7 +1020,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                                       <span style={{ fontSize: '0.62rem', color: '#ef4444', fontWeight: 800 }}>
                                         ⛔ CLOSED
                                       </span>
-                                    ) : plat.occupied ? (
+                                    ) : isPlatOccupied ? (
                                       <span style={{ fontSize: '0.62rem', color: '#eab308', fontWeight: 700 }}>
                                         OCCUPIED
                                       </span>
@@ -1045,7 +1036,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                                 </div>
                               </div>
 
-                              {plat.dwellSecondsRemaining != null && plat.occupied && (
+                              {plat.dwellSecondsRemaining != null && isPlatOccupied && (
                                 <span style={{ fontSize: '0.68rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                                   ⏱ {plat.dwellSecondsRemaining}s left
                                 </span>

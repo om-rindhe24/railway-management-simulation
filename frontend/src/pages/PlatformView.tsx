@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Platform, Train, ReallocationResult } from '../types';
 import { formatTrainLocation, formatNextStop } from '../utils/trainFormatters';
+import { getPlatformBerthOccupant, getPlatformWaitingTrains } from '../utils/platformMatching';
 import { CheckCircle, AlertOctagon, XCircle, Train as TrainIcon, Sliders, ShieldAlert } from 'lucide-react';
 
 interface PlatformViewProps {
@@ -90,7 +91,9 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
         }}
       >
         {platforms.map((platform) => {
-          const currentTrain = trains.find((t) => t.trainNumber === platform.currentTrainNumber);
+          const currentTrain = getPlatformBerthOccupant(platform, selectedStation, trains);
+          const isOccupied = Boolean(currentTrain);
+          const waitingTrains = getPlatformWaitingTrains(platform, selectedStation, trains, currentTrain?.trainNumber, 2);
 
           return (
             <div
@@ -99,7 +102,7 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
               style={{
                 borderColor: platform.isClosed
                   ? 'rgba(239, 68, 68, 0.4)'
-                  : platform.isOccupied
+                  : isOccupied
                   ? 'rgba(245, 158, 11, 0.4)'
                   : undefined,
                 padding: '20px',
@@ -137,7 +140,7 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                     <span className="badge badge-danger">
                       <XCircle size={12} /> CLOSED
                     </span>
-                  ) : platform.isOccupied ? (
+                  ) : isOccupied ? (
                     <span className="badge badge-warning">
                       <AlertOctagon size={12} /> OCCUPIED
                     </span>
@@ -171,7 +174,7 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                       fontWeight: 800,
                       color: platform.homeSignalAspect === 'RED' ? '#ef4444' : platform.homeSignalAspect === 'YELLOW' ? '#f59e0b' : '#10b981',
                     }}>
-                      ● {platform.homeSignalAspect || (platform.isOccupied || platform.isClosed ? 'RED' : 'GREEN')}
+                      ● {platform.homeSignalAspect || (isOccupied || platform.isClosed ? 'RED' : 'GREEN')}
                     </span>
                   </div>
 
@@ -196,7 +199,7 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                       fontWeight: 800,
                       color: platform.starterSignalAspect === 'RED' ? '#ef4444' : platform.starterSignalAspect === 'YELLOW' ? '#f59e0b' : '#10b981',
                     }}>
-                      ● {platform.starterSignalAspect || (platform.isOccupied && (platform.dwellSecondsRemaining ?? 0) === 0 ? 'GREEN' : 'RED')}
+                      ● {platform.starterSignalAspect || (isOccupied && (platform.dwellSecondsRemaining ?? 0) === 0 ? 'GREEN' : 'RED')}
                     </span>
                   </div>
                 </div>
@@ -220,12 +223,12 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                         Reason: {platform.closureReason || 'Scheduled track repair'}
                       </div>
                     </div>
-                  ) : platform.isOccupied ? (
+                  ) : isOccupied && currentTrain ? (
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', fontWeight: 700, fontSize: '0.85rem' }}>
                           <TrainIcon size={14} />
-                          <span>Docked: {platform.currentTrainNumber}</span>
+                          <span>Docked: {currentTrain.trainNumber}</span>
                         </div>
                         {platform.dwellSecondsRemaining != null && (
                           <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
@@ -234,40 +237,38 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-main)', marginTop: '4px' }}>
-                        {currentTrain?.trainName || 'Suburban Train Service'}
+                        {currentTrain.trainName || 'Suburban Train Service'}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Location: <strong style={{ color: '#f8fafc' }}>{formatTrainLocation(currentTrain)}</strong></span>
                         <span style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Next: {formatNextStop(currentTrain)}</span>
                       </div>
-                      {(() => {
-                        const waiting = platform.nextWaitingTrainNumber ||
-                          trains.find(t => (t.assignedPlatformNumber === platform.platformNumber || t.assignedPlatformId === platform.platformId) &&
-                            (t.status === 'WAITING' || t.status === 'APPROACHING') && t.trainNumber !== platform.currentTrainNumber)?.trainNumber;
-                        return waiting ? (
-                          <div style={{ fontSize: '0.72rem', color: '#eab308', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>Next Waiting:</span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{waiting}</span>
-                          </div>
-                        ) : null;
-                      })()}
+                      {waitingTrains.length > 0 && (
+                        <div style={{ fontSize: '0.72rem', color: '#eab308', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <span>Next Waiting:</span>
+                          {waitingTrains.map((wt) => (
+                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(234, 179, 8, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                              {wt.trainNumber}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div>
                       <div style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>
                         Track clear. Ready for incoming arrival.
                       </div>
-                      {(() => {
-                        const waiting = platform.nextWaitingTrainNumber ||
-                          trains.find(t => (t.assignedPlatformNumber === platform.platformNumber || t.assignedPlatformId === platform.platformId) &&
-                            (t.status === 'WAITING' || t.status === 'APPROACHING') && t.trainNumber !== platform.currentTrainNumber)?.trainNumber;
-                        return waiting ? (
-                          <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>Next Waiting:</span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{waiting}</span>
-                          </div>
-                        ) : null;
-                      })()}
+                      {waitingTrains.length > 0 && (
+                        <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <span>Next Waiting:</span>
+                          {waitingTrains.map((wt) => (
+                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                              {wt.trainNumber}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

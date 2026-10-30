@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Platform, Train, PlatformAllocation } from '../types';
 import { Clock, Info, AlertTriangle, ShieldCheck, X } from 'lucide-react';
+import { getPlatformBerthOccupant, getPlatformWaitingTrains } from '../utils/platformMatching';
 
 interface OccupancyTimelineProps {
   selectedStation: string;
@@ -100,32 +101,21 @@ export const OccupancyTimeline: React.FC<OccupancyTimelineProps> = ({
     });
 
     // 2. From currently occupied platform train
-    if (p.isOccupied && p.currentTrainNumber) {
-      const dockedTrain = trains.find((t) => t.trainNumber === p.currentTrainNumber);
-      const alreadyAdded = platformOccupancyMap[p.platformId].some((item) => item.train.trainNumber === p.currentTrainNumber);
+    const berthOccupant = getPlatformBerthOccupant(p, selectedStation, trains);
+    if (berthOccupant) {
+      const alreadyAdded = platformOccupancyMap[p.platformId].some((item) => item.train.trainNumber === berthOccupant.trainNumber);
       if (!alreadyAdded) {
         platformOccupancyMap[p.platformId].push({
-          train: dockedTrain || {
-            trainId: p.currentTrainId || 9999,
-            trainNumber: p.currentTrainNumber,
-            trainName: 'Active Docked Service',
-            trainType: 'LOCAL',
-            delayMinutes: 0,
-            assignedPlatformNumber: p.platformNumber,
-            status: 'AT_PLATFORM',
-          },
+          train: berthOccupant,
           start: p.occupancyStart || simulationTime,
           end: p.occupancyEnd || new Date(new Date(simulationTime).getTime() + 60000).toISOString(),
         });
       }
     }
 
-    // 3. From trains targeting this station and assigned to this platform
-    const stationTrains = trains.filter(
-      (t) => (t.assignedPlatformNumber === p.platformNumber || t.assignedPlatformId === p.platformId) &&
-             (t.targetStationCode === selectedStation || t.currentStationCode === selectedStation)
-    );
-    stationTrains.forEach((st) => {
+    // 3. From incoming/waiting trains assigned to this platform
+    const waitingTrains = getPlatformWaitingTrains(p, selectedStation, trains, berthOccupant?.trainNumber, 2);
+    waitingTrains.forEach((st) => {
       const alreadyAdded = platformOccupancyMap[p.platformId].some((item) => item.train.trainId === st.trainId);
       if (!alreadyAdded) {
         platformOccupancyMap[p.platformId].push({

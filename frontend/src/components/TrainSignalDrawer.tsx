@@ -273,7 +273,7 @@ export const TrainSignalDrawer: React.FC<TrainSignalDrawerProps> = ({
               <div style={{ color: 'var(--text-muted)' }}>
                 Target Platform:{' '}
                 <strong style={{ color: 'var(--text-main)' }}>
-                  {train.assignedPlatform ? `Platform ${train.assignedPlatform}` : 'None'}
+                  {train.assignedPlatform ? `Platform ${train.assignedPlatform}${train.targetStationCode ? ` (${train.targetStationCode})` : ''}` : 'None'}
                 </strong>
               </div>
               <div style={{ color: 'var(--text-muted)' }}>
@@ -670,7 +670,7 @@ export const TrainSignalDrawer: React.FC<TrainSignalDrawerProps> = ({
                 border: '1px solid var(--border-glow)',
               }}
             >
-              {train.assignedPlatform ? `Platform ${train.assignedPlatform}` : 'None Assigned'}
+              {train.assignedPlatform ? `Platform ${train.assignedPlatform}${train.targetStationCode ? ` (${train.targetStationCode})` : ''}` : 'None Assigned'}
             </span>
           </div>
         </div>

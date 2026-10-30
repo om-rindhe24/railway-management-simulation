@@ -308,6 +308,11 @@ public class Train {
         this.nextStationCode = nextStationCode;
     }
 
+    @jakarta.persistence.Transient
+    public String getStationCode() {
+        return targetStationCode != null ? targetStationCode : currentStationCode;
+    }
+
     public String getTargetStationCode() {
         return targetStationCode;
     }
