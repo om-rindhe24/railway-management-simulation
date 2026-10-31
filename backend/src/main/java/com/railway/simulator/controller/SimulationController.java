@@ -8,6 +8,8 @@ import com.railway.simulator.service.SimulationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/simulation")
 public class SimulationController {
@@ -23,7 +25,8 @@ public class SimulationController {
         SimulationStateDto state = new SimulationStateDto(
                 simulationService.getSimulationTime(),
                 simulationService.isRunning(),
-                simulationService.getSpeedMultiplier()
+                simulationService.getSpeedMultiplier(),
+                simulationService.isPeakHour()
         );
         return ResponseEntity.ok(ApiResponse.ok("Simulation state retrieved", state));
     }
@@ -62,5 +65,25 @@ public class SimulationController {
     public ResponseEntity<ApiResponse<String>> runDemoScenario() {
         String msg = simulationService.runDemoScenario();
         return ResponseEntity.ok(ApiResponse.ok("Demo scenario activated", msg));
+    }
+
+    @GetMapping("/peak-hour")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPeakHour() {
+        Map<String, Object> data = Map.of(
+                "isPeakHour", simulationService.isPeakHour(),
+                "activeTrains", simulationService.getActiveFleetCount()
+        );
+        return ResponseEntity.ok(ApiResponse.ok("Peak hour state retrieved", data));
+    }
+
+    @PostMapping("/peak-hour")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> setPeakHour(@RequestBody Map<String, Object> request) {
+        boolean enabled = Boolean.TRUE.equals(request.get("enabled")) || "true".equalsIgnoreCase(String.valueOf(request.get("enabled")));
+        simulationService.setPeakHourMode(enabled);
+        Map<String, Object> data = Map.of(
+                "isPeakHour", simulationService.isPeakHour(),
+                "activeTrains", simulationService.getActiveFleetCount()
+        );
+        return ResponseEntity.ok(ApiResponse.ok("Peak hour mode updated", data));
     }
 }

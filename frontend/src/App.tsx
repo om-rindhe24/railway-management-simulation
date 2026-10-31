@@ -281,7 +281,7 @@ export const App: React.FC = () => {
           <AllocationHistoryPage history={history} selectedStation={selectedStation} />
         )}
 
-        {activeTab === 'analytics' && <AnalyticsPage kpis={kpis} />}
+        {activeTab === 'analytics' && <AnalyticsPage kpis={kpis} onRefresh={refreshStationData} />}
       </div>
 
       {/* Shared Unified Train & Signalling Drawer */}

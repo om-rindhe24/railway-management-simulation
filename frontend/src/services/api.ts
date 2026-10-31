@@ -97,6 +97,12 @@ export const api = {
       body: JSON.stringify({ speed }),
     }),
   runDemoScenario: () => fetchJson<string>('/simulation/demo', { method: 'POST' }),
+  getPeakHour: () => fetchJson<{ peakHour: boolean; activeFleet: number }>('/simulation/peak-hour'),
+  setPeakHour: (enabled: boolean) =>
+    fetchJson<{ peakHour: boolean; activeFleet: number }>('/simulation/peak-hour', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
 
   // Analytics
   getAnalytics: () => fetchJson<Record<string, any>>('/analytics'),
