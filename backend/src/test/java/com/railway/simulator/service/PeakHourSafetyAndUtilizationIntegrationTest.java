@@ -11,6 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import com.railway.simulator.config.PeakHourFleetConfig;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,16 +71,28 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Requirement 3: Peak Hour toggle cleanly adds about 30 extra trains and removing it cleanly restores 27-train fleet")
+    @DisplayName("Requirement 3 & 4: Peak Hour toggle adds realistic mix (24 locals, 6 long-distance), enforces fast lines, and cleanly removes on disable")
     void testPeakHourToggleAndCleanRemoval() {
-        assertEquals(27, trainRepository.findByIsActiveTrue().size(), "Default fleet must be 27 trains");
+        List<Train> baselineFleet = trainRepository.findByIsActiveTrue();
+        assertEquals(27, baselineFleet.size(), "Default fleet must be 27 trains");
         assertFalse(simulationService.isPeakHour(), "Default mode must have isPeakHour = false");
+
+        // Baseline category counts
+        Map<TrainCategory, Long> baseCatCounts = baselineFleet.stream()
+                .collect(Collectors.groupingBy(Train::getTrainCategory, Collectors.counting()));
+        assertEquals(9L, baseCatCounts.get(TrainCategory.SLOW_LOCAL));
+        assertEquals(6L, baseCatCounts.get(TrainCategory.FAST_LOCAL));
+        assertEquals(3L, baseCatCounts.get(TrainCategory.EXPRESS));
+        assertEquals(3L, baseCatCounts.get(TrainCategory.SUPERFAST));
+        assertEquals(3L, baseCatCounts.get(TrainCategory.PREMIUM));
+        assertEquals(2L, baseCatCounts.get(TrainCategory.SPECIAL));
+        assertEquals(1L, baseCatCounts.get(TrainCategory.FREIGHT));
 
         // Enable peak hour
         simulationService.setPeakHourMode(true);
         assertTrue(simulationService.isPeakHour());
         List<Train> peakFleet = trainRepository.findByIsActiveTrue();
-        assertEquals(55, peakFleet.size(), "Peak Hour fleet must contain 55 trains (27 baseline + 28 peak)");
+        assertEquals(57, peakFleet.size(), "Peak Hour fleet must contain 57 trains (27 baseline + 30 peak)");
 
         // Assert no two trains start in the same block
         Map<String, List<String>> blockToTrains = new HashMap<>();
@@ -90,6 +104,39 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
         for (Map.Entry<String, List<String>> entry : blockToTrains.entrySet()) {
             assertEquals(1, entry.getValue().size(),
                     "Block " + entry.getKey() + " must have only 1 train, found: " + entry.getValue());
+        }
+
+        // Assert Peak Hour category breakdown matches configured constants
+        Map<TrainCategory, Long> peakCatCounts = peakFleet.stream()
+                .collect(Collectors.groupingBy(Train::getTrainCategory, Collectors.counting()));
+        assertEquals(9L + 12L, peakCatCounts.get(TrainCategory.SLOW_LOCAL)); // 21
+        assertEquals(6L + 12L, peakCatCounts.get(TrainCategory.FAST_LOCAL)); // 18
+        assertEquals(3L + PeakHourFleetConfig.EXTRA_EXPRESS_COUNT, peakCatCounts.get(TrainCategory.EXPRESS)); // 5
+        assertEquals(3L + PeakHourFleetConfig.EXTRA_SUPERFAST_COUNT, peakCatCounts.get(TrainCategory.SUPERFAST)); // 5
+        assertEquals(3L + PeakHourFleetConfig.EXTRA_PREMIUM_COUNT, peakCatCounts.get(TrainCategory.PREMIUM)); // 5
+        assertEquals(2L, peakCatCounts.get(TrainCategory.SPECIAL)); // 2
+        assertEquals(1L, peakCatCounts.get(TrainCategory.FREIGHT)); // 1
+
+        // Assert extra long-distance and fast local trains are on FAST lines
+        List<Train> peakExtraTrains = peakFleet.stream()
+                .filter(t -> t.getTrainNumber().startsWith("SIM-PK-"))
+                .toList();
+        assertEquals(PeakHourFleetConfig.TOTAL_PEAK_TRAINS, peakExtraTrains.size());
+
+        for (Train t : peakExtraTrains) {
+            boolean isFastService = (t.getTrainCategory() == TrainCategory.FAST_LOCAL
+                    || t.getTrainCategory() == TrainCategory.EXPRESS
+                    || t.getTrainCategory() == TrainCategory.SUPERFAST
+                    || t.getTrainCategory() == TrainCategory.PREMIUM);
+            String blockId = t.getCurrentBlockId();
+            assertNotNull(blockId);
+            if (isFastService) {
+                assertTrue(blockId.endsWith("-FU") || blockId.endsWith("-FD"),
+                        "Fast service " + t.getTrainNumber() + " (" + t.getTrainCategory() + ") must be on FAST line: " + blockId);
+            } else {
+                assertTrue(blockId.endsWith("-SU") || blockId.endsWith("-SD"),
+                        "Slow service " + t.getTrainNumber() + " must be on SLOW line: " + blockId);
+            }
         }
 
         // Disable peak hour
@@ -139,6 +186,52 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
     }
 
     @Test
+    @DisplayName("BUG 2: Zero-history 0/0 edge case produces 0.0% rolling utilization with 0m occupied / 0m available without NaN")
+    void testRollingPlatformUtilizationZeroDividedByZeroSafe() {
+        simulationService.resetSimulation();
+
+        // Immediately query analytics before any ticks run
+        Map<String, Object> kpis = analyticsService.getDashboardKpis();
+        assertEquals(0.0, kpis.get("rolling60MinUtilizationPercent"), "Rolling utilization must be 0.0% when 0 history");
+        assertEquals(0.0, kpis.get("occupiedPlatformMinutes"), "Occupied platform minutes must be 0.0 when 0 history");
+        assertEquals(0.0, kpis.get("availablePlatformMinutes"), "Available platform minutes must be 0.0 when 0 history");
+        assertEquals(0, kpis.get("historyMinutes"), "History minutes must be 0");
+        assertFalse(Double.isNaN((Double) kpis.get("rolling60MinUtilizationPercent")));
+    }
+
+    @Test
+    @DisplayName("BUG 2: Snapshot and Rolling utilization are distinct, correctly bound, and non-swapped")
+    void testSnapshotVsRollingBindingConsistency() {
+        simulationService.resetSimulation();
+        // Run 40 ticks of 15s = 600s = 10 simulated minutes
+        for (int i = 0; i < 40; i++) {
+            simulationService.advanceTrainStates(15L);
+        }
+
+        Map<String, Object> kpis = analyticsService.getDashboardKpis();
+
+        int occupiedNow = ((Number) kpis.get("occupiedPlatforms")).intValue();
+        int totalPlats = ((Number) kpis.get("totalPlatforms")).intValue();
+        int closedPlats = ((Number) kpis.get("closedPlatforms")).intValue();
+        int openPlats = totalPlats - closedPlats;
+
+        double expectedSnapshot = Math.round(((double) occupiedNow / openPlats * 100.0) * 10.0) / 10.0;
+        double actualSnapshot = ((Number) kpis.get("snapshotPlatformUtilizationPercent")).doubleValue();
+        assertEquals(expectedSnapshot, actualSnapshot, "Snapshot utilization must strictly match occupied/open platforms now");
+
+        double occMins = ((Number) kpis.get("occupiedPlatformMinutes")).doubleValue();
+        double availMins = ((Number) kpis.get("availablePlatformMinutes")).doubleValue();
+        double actualRolling = ((Number) kpis.get("rolling60MinUtilizationPercent")).doubleValue();
+
+        assertTrue(availMins > 0.0, "Available platform minutes must be > 0 after 10 simulated minutes");
+        double expectedRolling = Math.round((occMins / availMins * 100.0) * 10.0) / 10.0;
+        assertEquals(expectedRolling, actualRolling, "Rolling utilization must be strictly consistent with occupiedMins / availMins");
+
+        int historyMins = ((Number) kpis.get("historyMinutes")).intValue();
+        assertEquals(10, historyMins, "History minutes should report 10 min after 600 simulated seconds");
+    }
+
+    @Test
     @DisplayName("Requirement 4: Peak Hour 2-hour simulation safety (55 trains, 5x speed): no teleport, no block collision, no line-type violation, >=80% moved >5km, tick <500ms")
     void testPeakHour2HourSimulationSafety() {
         simulationService.resetSimulation();
@@ -149,7 +242,7 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
 
         simulationService.setPeakHourMode(true);
         List<Train> initialFleet = trainRepository.findByIsActiveTrue();
-        assertEquals(55, initialFleet.size());
+        assertEquals(57, initialFleet.size());
 
         Map<String, TrainCategory> categories = new HashMap<>();
         Map<String, String> initialBlocks = new HashMap<>();
@@ -214,9 +307,9 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
             }
         }
 
-        // Fleet size stays constant (55 trains active)
+        // Fleet size stays constant (57 trains active)
         List<Train> activeAfter2Hours = trainRepository.findByIsActiveTrue();
-        assertEquals(55, activeAfter2Hours.size(), "Fleet size must stay constant at 55 trains after 2 hours");
+        assertEquals(57, activeAfter2Hours.size(), "Fleet size must stay constant at 57 trains after 2 hours");
 
         // No train on wrong line type or direction
         for (Train t : activeAfter2Hours) {
@@ -229,6 +322,9 @@ public class PeakHourSafetyAndUtilizationIntegrationTest {
                 if (initialCat == TrainCategory.SLOW_LOCAL) {
                     assertFalse("FU".equals(lineCode) || "FD".equals(lineCode),
                             "Slow local " + t.getTrainNumber() + " must not run on fast line block " + blkId);
+                } else if (initialCat == TrainCategory.EXPRESS || initialCat == TrainCategory.SUPERFAST || initialCat == TrainCategory.PREMIUM) {
+                    assertFalse("SU".equals(lineCode) || "SD".equals(lineCode),
+                            "Long-distance " + t.getTrainNumber() + " must not run on slow line block " + blkId);
                 }
             }
         }

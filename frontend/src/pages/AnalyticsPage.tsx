@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Clock, Layers, Activity, Zap, HelpCircle, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, Clock, Layers, Activity, Zap, HelpCircle, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 
 interface AnalyticsPageProps {
@@ -18,6 +18,7 @@ interface StationUtilization {
 export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh }) => {
   const [togglingPeak, setTogglingPeak] = useState<boolean>(false);
   const [localPeakHour, setLocalPeakHour] = useState<boolean | null>(null);
+  const [controlError, setControlError] = useState<string | null>(null);
 
   const isPeakHour = localPeakHour !== null ? localPeakHour : Boolean(kpis?.isPeakHour);
   const categoryDist: Record<string, number> = kpis?.categoryDistribution || {};
@@ -29,15 +30,17 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
   const handleTogglePeakHour = async () => {
     try {
       setTogglingPeak(true);
+      setControlError(null);
       const nextState = !isPeakHour;
       setLocalPeakHour(nextState);
       await api.setPeakHour(nextState);
       if (onRefresh) {
         onRefresh();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to toggle peak hour mode:', err);
       setLocalPeakHour(isPeakHour);
+      setControlError(err?.message || 'Control request failed (HTTP Error)');
     } finally {
       setTogglingPeak(false);
     }
@@ -50,8 +53,59 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
     SLOW_DOWN: { label: 'Slow Down (Southbound)', desc: 'All-station suburban stopping services', color: '#10b981' },
   };
 
+  const historyMins = kpis?.historyMinutes ?? 0;
+  const occupiedMins = kpis?.occupiedPlatformMinutes ?? 0;
+  const availableMins = kpis?.availablePlatformMinutes ?? 0;
+  const rollingPercent = availableMins > 0 ? (kpis?.rolling60MinUtilizationPercent ?? 0) : 0;
+
+  const occupiedNow = kpis?.occupiedPlatforms || 0;
+  const totalPlats = kpis?.totalPlatforms || 0;
+  const closedPlats = kpis?.closedPlatforms || 0;
+  const openPlats = Math.max(0, totalPlats - closedPlats);
+  const snapshotPercent = kpis?.snapshotPlatformUtilizationPercent ?? (openPlats > 0 ? Math.round((occupiedNow / openPlats) * 1000) / 10 : 0);
+
   return (
     <div className="page-container">
+      {/* Control Error Toast / Inline Banner */}
+      {controlError && (
+        <div
+          role="alert"
+          style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid #ef4444',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 18px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#fca5a5',
+            fontSize: '0.88rem',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} color="#ef4444" />
+            <span><strong>Control Error:</strong> {controlError}</span>
+          </div>
+          <button
+            onClick={() => setControlError(null)}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '4px',
+              color: '#fca5a5',
+              cursor: 'pointer',
+              padding: '4px 10px',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Header with Peak Hour Mode Toggle */}
       <div className="card-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -63,9 +117,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
+            id="peak-hour-toggle-btn"
             onClick={handleTogglePeakHour}
             disabled={togglingPeak}
-            title="Formula: Toggles between 27 baseline trains and 55 peak-hour trains with realistic headway spacing and signal interlocking."
+            title="Formula: Toggles between 27 baseline trains and 57 peak-hour trains with realistic headway spacing and signal interlocking."
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -79,6 +134,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
               fontWeight: 700,
               fontSize: '0.88rem',
               transition: 'all 0.2s ease',
+              opacity: togglingPeak ? 0.6 : 1,
             }}
           >
             <Zap size={16} color={isPeakHour ? '#f59e0b' : 'var(--text-muted)'} />
@@ -93,7 +149,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
                 fontWeight: 800,
               }}
             >
-              {isPeakHour ? '55 Trains' : '27 Trains'}
+              {isPeakHour ? `${kpis?.activeTrains || 57} Trains` : `${kpis?.activeTrains || 27} Trains`}
             </span>
           </button>
         </div>
@@ -108,11 +164,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
             <Activity size={16} color="var(--color-primary)" />
           </div>
           <div className="kpi-value" style={{ color: 'var(--color-primary)' }}>
-            {kpis?.rolling60MinUtilizationPercent ?? kpis?.platformUtilizationPercent ?? 0}%
+            {rollingPercent}%
           </div>
           <div className="kpi-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{kpis?.occupiedPlatformMinutes ?? 0}m occupied / {kpis?.availablePlatformMinutes ?? 0}m available</span>
-            <span title="Formula: occupied_platform_minutes / available_platform_minutes (rolling 60m)"><HelpCircle size={13} color="var(--text-muted)" /></span>
+            <span>
+              {historyMins < 60
+                ? `building history (${historyMins} min) • ${occupiedMins}m occupied / ${availableMins}m available`
+                : `${occupiedMins}m occupied / ${availableMins}m available`}
+            </span>
+            <span title="Formula: occupied_platform_minutes / available_platform_minutes (rolling 60m window)"><HelpCircle size={13} color="var(--text-muted)" /></span>
           </div>
         </div>
 
@@ -123,10 +183,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
             <Activity size={16} color="var(--color-accent)" />
           </div>
           <div className="kpi-value" style={{ color: 'var(--color-accent)' }}>
-            {kpis?.snapshotPlatformUtilizationPercent ?? 0}%
+            {snapshotPercent}%
           </div>
           <div className="kpi-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{kpis?.occupiedPlatforms || 0} of {(kpis?.totalPlatforms || 0) - (kpis?.closedPlatforms || 0)} Open ({kpis?.closedPlatforms || 0} closed)</span>
+            <span>{`${occupiedNow} of ${openPlats} occupied now, ${closedPlats} closed`}</span>
             <span title="Formula: current_occupied_platforms / (total_platforms - closed_platforms)"><HelpCircle size={13} color="var(--text-muted)" /></span>
           </div>
         </div>
@@ -169,9 +229,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Activity size={18} color="var(--color-primary)" />
-              <span>Busiest 3 Stations by Utilization (Last 60 min)</span>
+              <span>Busiest 3 Stations by Utilization</span>
             </span>
-            <span title="Formula: Top 3 stations by occupied platform-minutes / available platform-minutes over the last 60 simulated minutes.">
+            <span title="Formula: Top 3 stations by occupied platform-minutes / available platform-minutes over the rolling window.">
               <HelpCircle size={15} color="var(--text-muted)" />
             </span>
           </h3>
@@ -234,7 +294,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Layers size={18} color="var(--color-accent)" />
-              <span>Utilization per Line Type (Last 60 min)</span>
+              <span>Utilization per Line Type</span>
             </span>
             <span title="Formula: Sum of occupied platform-minutes for all platforms configured on this line type / available platform-minutes on this line type.">
               <HelpCircle size={15} color="var(--text-muted)" />

@@ -325,9 +325,17 @@ public class SimulationService {
         List<Train> trains = trainRepository.findByIsActiveTrue();
         Set<String> claimedStationPlatforms = new HashSet<>();
         for (Train ot : trains) {
+            if (ot.getCurrentBlockId() != null && ot.getCurrentBlockId().matches("BLK-[A-Za-z0-9]+-P\\d+")) {
+                claimedStationPlatforms.add(ot.getCurrentBlockId().substring(4).toUpperCase());
+            }
             if (ot.getTargetStationCode() != null && ot.getAssignedPlatformNumber() != null
                     && (ot.getStatus() == TrainStatus.AT_PLATFORM || ot.getStatus() == TrainStatus.APPROACHING || ot.getStatus() == TrainStatus.WAITING)) {
                 claimedStationPlatforms.add(ot.getTargetStationCode().toUpperCase() + "-P" + ot.getAssignedPlatformNumber());
+            }
+        }
+        for (TrackBlock tb : trackBlocks.values()) {
+            if (tb.isOccupied() && tb.getBlockId() != null && tb.getBlockId().matches("BLK-[A-Za-z0-9]+-P\\d+")) {
+                claimedStationPlatforms.add(tb.getBlockId().substring(4).toUpperCase());
             }
         }
         for (Train train : trains) {
@@ -457,9 +465,17 @@ public class SimulationService {
 
         Set<String> claimedStationPlatforms = new HashSet<>();
         for (Train ot : trains) {
+            if (ot.getCurrentBlockId() != null && ot.getCurrentBlockId().matches("BLK-[A-Za-z0-9]+-P\\d+")) {
+                claimedStationPlatforms.add(ot.getCurrentBlockId().substring(4).toUpperCase());
+            }
             if (ot.getTargetStationCode() != null && ot.getAssignedPlatformNumber() != null
                     && (ot.getStatus() == TrainStatus.AT_PLATFORM || ot.getStatus() == TrainStatus.APPROACHING || ot.getStatus() == TrainStatus.WAITING)) {
                 claimedStationPlatforms.add(ot.getTargetStationCode().toUpperCase() + "-P" + ot.getAssignedPlatformNumber());
+            }
+        }
+        for (TrackBlock tb : trackBlocks.values()) {
+            if (tb.isOccupied() && tb.getBlockId() != null && tb.getBlockId().matches("BLK-[A-Za-z0-9]+-P\\d+")) {
+                claimedStationPlatforms.add(tb.getBlockId().substring(4).toUpperCase());
             }
         }
 
@@ -493,11 +509,17 @@ public class SimulationService {
             if (assignedPlatId != null) {
                 Platform p = platformRepository.findById(assignedPlatId).orElse(null);
                 if (p != null) {
-                    if (p.getIsClosed()) {
+                    if (Boolean.TRUE.equals(p.getIsClosed())) {
                         platformClosedOrOccupied = true;
-                    } else if (p.getIsOccupied() && p.getCurrentTrainId() != null && !p.getCurrentTrainId().equals(train.getTrainId())) {
+                    } else if (Boolean.TRUE.equals(p.getIsOccupied()) && p.getCurrentTrainId() != null && !p.getCurrentTrainId().equals(train.getTrainId())) {
                         platformClosedOrOccupied = true;
                     }
+                }
+            }
+            if (targetPlatformBlockId != null && trackBlocks.containsKey(targetPlatformBlockId)) {
+                TrackBlock tpb = trackBlocks.get(targetPlatformBlockId);
+                if (tpb != null && tpb.isOccupied() && !train.getTrainId().equals(tpb.getOccupyingTrainId())) {
+                    platformClosedOrOccupied = true;
                 }
             }
 
@@ -573,14 +595,14 @@ public class SimulationService {
                         // Through train continues along corridor to next scheduled stop
                         String departStation = (currentBlock != null && currentBlock.getFromStationCode() != null) ? currentBlock.getFromStationCode() : targetStation;
                         String departBlockId = currentBlock != null ? currentBlock.getNextBlockId() : null;
+                        boolean isFastTrain = (train.getTrainCategory() == TrainCategory.FAST_LOCAL
+                                || train.getTrainCategory() == TrainCategory.EXPRESS
+                                || train.getTrainCategory() == TrainCategory.MAIL
+                                || train.getTrainCategory() == TrainCategory.SUPERFAST
+                                || train.getTrainCategory() == TrainCategory.PREMIUM);
                         if (departBlockId == null && departStation != null) {
                             List<TrackEdge> edges = corridorGraph.getOutgoingEdges(departStation);
-                            boolean isFast = (train.getTrainCategory() == TrainCategory.FAST_LOCAL
-                                    || train.getTrainCategory() == TrainCategory.EXPRESS
-                                    || train.getTrainCategory() == TrainCategory.MAIL
-                                    || train.getTrainCategory() == TrainCategory.SUPERFAST
-                                    || train.getTrainCategory() == TrainCategory.PREMIUM);
-                            LineType preferredLine = isFast ?
+                            LineType preferredLine = isFastTrain ?
                                     ("UP".equalsIgnoreCase(trainDir) ? LineType.FAST_UP : LineType.FAST_DOWN) :
                                     ("UP".equalsIgnoreCase(trainDir) ? LineType.SLOW_UP : LineType.SLOW_DOWN);
                             LineType fallbackLine = "UP".equalsIgnoreCase(trainDir) ? LineType.SLOW_UP : LineType.SLOW_DOWN;
@@ -590,13 +612,23 @@ public class SimulationService {
                                     break;
                                 }
                             }
-                            if (departBlockId == null) {
+                            if (departBlockId == null && !isFastTrain) {
                                 for (TrackEdge e : edges) {
                                     if (e.getTrackType() == fallbackLine) {
                                         departBlockId = "BLK-" + e.getFromStationCode() + "-" + e.getToStationCode() + "-" + corridorGraph.getLineCode(e.getTrackType());
                                         break;
                                     }
                                 }
+                            }
+                        }
+
+                        if (train.getTrainCategory() == TrainCategory.SLOW_LOCAL && departBlockId != null) {
+                            if (departBlockId.endsWith("-FU")) {
+                                String suBlock = departBlockId.substring(0, departBlockId.length() - 2) + "SU";
+                                if (trackBlocks.containsKey(suBlock)) departBlockId = suBlock;
+                            } else if (departBlockId.endsWith("-FD")) {
+                                String sdBlock = departBlockId.substring(0, departBlockId.length() - 2) + "SD";
+                                if (trackBlocks.containsKey(sdBlock)) departBlockId = sdBlock;
                             }
                         }
 
@@ -774,8 +806,12 @@ public class SimulationService {
                         }
                     }
 
-                    // Pass 2: Fallback to opposite line type in same direction if no primary platform exists
-                    if (compatibleFree == null && !candidatePlatforms.isEmpty()) {
+                    boolean isLongDistTrain = (train.getTrainCategory() == TrainCategory.EXPRESS
+                            || train.getTrainCategory() == TrainCategory.MAIL
+                            || train.getTrainCategory() == TrainCategory.SUPERFAST
+                            || train.getTrainCategory() == TrainCategory.PREMIUM);
+                    // Pass 2: Fallback to opposite line type in same direction if no primary platform exists (never for long-distance trains)
+                    if (compatibleFree == null && !candidatePlatforms.isEmpty() && !isLongDistTrain) {
                         compatibleFree = candidatePlatforms.get(0);
                     }
 
@@ -957,6 +993,17 @@ public class SimulationService {
                                     && pBlockFree
                                     && (newProgress >= 100.0 || (dRemToStationMeters <= 25.0 && currentSpeed <= 15.0));
 
+                            if (isEnteringStation && !pBlockFree && (newProgress >= 100.0 || dRemToStationMeters <= 25.0)) {
+                                currentProgress = SignalSpeedConfig.STOP_PROGRESS_PERCENT;
+                                currentSpeed = 0.0;
+                                train.setStatus(TrainStatus.WAITING);
+                                train.setSpeedKmH(0.0);
+                                train.setProgressPercent(currentProgress);
+                                train.setSignalAspect(SignalAspect.RED);
+                                train.setWaitingReason("Waiting at signal: platform " + (assignedPlatNum != null ? assignedPlatNum : "?") + " at " + targetStation + " is occupied");
+                                break;
+                            }
+
                             if (isInsidePlatformBlock) {
                                 currentProgress = Math.min(50.0, newProgress);
                                 if (currentSpeed <= 0.0) {
@@ -1124,6 +1171,25 @@ public class SimulationService {
         }
 
         recalculateSignalling();
+
+        // Record platform occupancy slice for rolling platform utilization history
+        Set<Long> occupiedPlatIds = new HashSet<>();
+        Set<Long> closedPlatIds = new HashSet<>();
+        for (Platform p : platformRepository.findAll()) {
+            if (Boolean.TRUE.equals(p.getIsOccupied())) {
+                occupiedPlatIds.add(p.getPlatformId());
+            }
+            if (Boolean.TRUE.equals(p.getIsClosed())) {
+                closedPlatIds.add(p.getPlatformId());
+            }
+        }
+        platformHistory.addLast(new PlatformStateSlice(simulationTime, secondsAdvanced, occupiedPlatIds, closedPlatIds));
+
+        // Purge slices older than 65 minutes
+        LocalDateTime purgeCutoff = simulationTime.minusMinutes(65);
+        while (!platformHistory.isEmpty() && platformHistory.peekFirst().getTime().isBefore(purgeCutoff)) {
+            platformHistory.pollFirst();
+        }
     }
 
     /**
@@ -1402,25 +1468,39 @@ public class SimulationService {
         Platform turnaroundPlat = null;
         for (Platform p : stationPlatforms) {
             if (p.getLineType() == targetLineType && !Boolean.TRUE.equals(p.getIsClosed())) {
+                boolean pFree = !Boolean.TRUE.equals(p.getIsOccupied()) || train.getTrainId().equals(p.getCurrentTrainId());
                 String pBlockId = "BLK-" + tgtUpper + "-P" + p.getPlatformNumber();
                 TrackBlock tb = trackBlocks.get(pBlockId);
-                if (tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()))) {
+                boolean tbFree = tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()));
+                if (pFree && tbFree) {
                     turnaroundPlat = p;
                     break;
                 }
             }
         }
-        if (turnaroundPlat == null) {
+        boolean isLongDistance = (train.getTrainCategory() == TrainCategory.EXPRESS
+                || train.getTrainCategory() == TrainCategory.MAIL
+                || train.getTrainCategory() == TrainCategory.SUPERFAST
+                || train.getTrainCategory() == TrainCategory.PREMIUM);
+        if (turnaroundPlat == null && !isLongDistance) {
             for (Platform p : stationPlatforms) {
                 if (!Boolean.TRUE.equals(p.getIsClosed()) && (newDir.equalsIgnoreCase(p.getDirection()) || "COMMON".equalsIgnoreCase(p.getDirection()))) {
+                    boolean pFree = !Boolean.TRUE.equals(p.getIsOccupied()) || train.getTrainId().equals(p.getCurrentTrainId());
                     String pBlockId = "BLK-" + tgtUpper + "-P" + p.getPlatformNumber();
                     TrackBlock tb = trackBlocks.get(pBlockId);
-                    if (tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()))) {
+                    boolean tbFree = tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()));
+                    if (pFree && tbFree) {
                         turnaroundPlat = p;
                         break;
                     }
                 }
             }
+        }
+        if (turnaroundPlat == null) {
+            train.setStatus(TrainStatus.DEPARTED);
+            train.setActualDeparture(simulationTime != null ? simulationTime.plusSeconds(30) : LocalDateTime.now().plusSeconds(30));
+            trainRepository.save(train);
+            return;
         }
 
         train.setDirection(newDir);
@@ -1493,7 +1573,7 @@ public class SimulationService {
                 if (trainRepository.findByTrainNumber(spec.trainNumber).isPresent()) continue;
 
                 Train t = new Train(spec.trainNumber, spec.trainName, spec.trainType,
-                        spec.source, spec.destination, 5,
+                        spec.source, spec.destination, spec.trainType.getDefaultSimulationPriority(),
                         now, now.plusMinutes(45), null, spec.destination);
                 t.setTrainCategory(spec.category);
                 t.setDirection(spec.direction);
@@ -1584,17 +1664,18 @@ public class SimulationService {
                         long occ = e.getValue().stream().filter(Platform::getIsOccupied).count();
                         long avail = e.getValue().stream().filter(p -> !p.getIsClosed()).count();
                         double u = avail > 0 ? (double) occ / avail * 100.0 : 0.0;
-                        return new StationUtilizationDto(code, name, Math.round(u * 10.0) / 10.0, occ * 1.0, avail * 1.0);
+                        return new StationUtilizationDto(code, name, Math.round(u * 10.0) / 10.0, 0.0, 0.0);
                     })
                     .sorted(Comparator.comparingDouble(StationUtilizationDto::getUtilizationPercent).reversed())
                     .limit(3)
                     .toList();
 
             return new PlatformUtilizationMetrics(
+                    0.0,
                     Math.round(snapshotUtil * 10.0) / 10.0,
-                    Math.round(snapshotUtil * 10.0) / 10.0,
-                    currentOccupied * 1.0,
-                    currentAvailable * 1.0,
+                    0.0,
+                    0.0,
+                    0,
                     busiest,
                     lineTypeMap
             );
@@ -1645,6 +1726,7 @@ public class SimulationService {
         }
 
         double overallUtil = totalAvailableMinutes > 0 ? (totalOccupiedMinutes / totalAvailableMinutes) * 100.0 : 0.0;
+        int historyMinutes = (int) Math.min(windowMinutes, Math.max(1, Math.round(totalWindowSeconds / 60.0)));
 
         Map<String, Double> lineTypeMap = new LinkedHashMap<>();
         for (LineType lt : List.of(LineType.FAST_UP, LineType.FAST_DOWN, LineType.SLOW_UP, LineType.SLOW_DOWN)) {
@@ -1671,6 +1753,7 @@ public class SimulationService {
                 Math.round(snapshotUtil * 10.0) / 10.0,
                 Math.round(totalOccupiedMinutes * 10.0) / 10.0,
                 Math.round(totalAvailableMinutes * 10.0) / 10.0,
+                historyMinutes,
                 busiest,
                 lineTypeMap
         );
@@ -1722,16 +1805,19 @@ public class SimulationService {
         private final double snapshotUtilizationPercent;
         private final double totalOccupiedPlatformMinutes;
         private final double totalAvailablePlatformMinutes;
+        private final int historyMinutes;
         private final List<StationUtilizationDto> busiestStations;
         private final Map<String, Double> lineTypeUtilization;
 
         public PlatformUtilizationMetrics(double overallUtilizationPercent, double snapshotUtilizationPercent,
                                         double totalOccupiedPlatformMinutes, double totalAvailablePlatformMinutes,
+                                        int historyMinutes,
                                         List<StationUtilizationDto> busiestStations, Map<String, Double> lineTypeUtilization) {
             this.overallUtilizationPercent = overallUtilizationPercent;
             this.snapshotUtilizationPercent = snapshotUtilizationPercent;
             this.totalOccupiedPlatformMinutes = totalOccupiedPlatformMinutes;
             this.totalAvailablePlatformMinutes = totalAvailablePlatformMinutes;
+            this.historyMinutes = historyMinutes;
             this.busiestStations = busiestStations;
             this.lineTypeUtilization = lineTypeUtilization;
         }
@@ -1740,6 +1826,7 @@ public class SimulationService {
         public double getSnapshotUtilizationPercent() { return snapshotUtilizationPercent; }
         public double getTotalOccupiedPlatformMinutes() { return totalOccupiedPlatformMinutes; }
         public double getTotalAvailablePlatformMinutes() { return totalAvailablePlatformMinutes; }
+        public int getHistoryMinutes() { return historyMinutes; }
         public List<StationUtilizationDto> getBusiestStations() { return busiestStations; }
         public Map<String, Double> getLineTypeUtilization() { return lineTypeUtilization; }
     }

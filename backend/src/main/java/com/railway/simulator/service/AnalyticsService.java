@@ -84,9 +84,10 @@ public class AnalyticsService {
                 ? simulationService.getRollingPlatformUtilizationMetrics(60)
                 : null;
 
-        double rolling60MinUtil = rollingMetrics != null ? rollingMetrics.getOverallUtilizationPercent() : snapshotUtilizationPercent;
-        double occupiedPlatMinutes = rollingMetrics != null ? rollingMetrics.getTotalOccupiedPlatformMinutes() : occupiedPlatforms * 1.0;
-        double availablePlatMinutes = rollingMetrics != null ? rollingMetrics.getTotalAvailablePlatformMinutes() : (totalPlatforms - closedPlatforms) * 1.0;
+        double rolling60MinUtil = rollingMetrics != null ? rollingMetrics.getOverallUtilizationPercent() : 0.0;
+        double occupiedPlatMinutes = rollingMetrics != null ? rollingMetrics.getTotalOccupiedPlatformMinutes() : 0.0;
+        double availablePlatMinutes = rollingMetrics != null ? rollingMetrics.getTotalAvailablePlatformMinutes() : 0.0;
+        int historyMinutes = rollingMetrics != null ? rollingMetrics.getHistoryMinutes() : 0;
         List<SimulationService.StationUtilizationDto> busiestStations = rollingMetrics != null ? rollingMetrics.getBusiestStations() : Collections.emptyList();
         Map<String, Double> lineTypeUtilization = rollingMetrics != null ? rollingMetrics.getLineTypeUtilization() : Collections.emptyMap();
 
@@ -106,6 +107,7 @@ public class AnalyticsService {
         kpis.put("rolling60MinUtilizationPercent", Math.round(rolling60MinUtil * 10.0) / 10.0);
         kpis.put("occupiedPlatformMinutes", Math.round(occupiedPlatMinutes * 10.0) / 10.0);
         kpis.put("availablePlatformMinutes", Math.round(availablePlatMinutes * 10.0) / 10.0);
+        kpis.put("historyMinutes", historyMinutes);
         kpis.put("busiestStations", busiestStations);
         kpis.put("lineTypeUtilization", lineTypeUtilization);
 
