@@ -1,3 +1,4 @@
+// Usage: node scripts/verify-platform-cards.js [fixed|before|compare]
 // Verification script checking platform cards across all 24 stations against the live API
 // Asserts the 4 rules from the prompt:
 // (a) every displayed occupant has currentBlockId == that platform's block (BLK-<STATION>-P<n>)

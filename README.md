@@ -143,6 +143,17 @@ cd frontend
 npm run build
 ```
 
+### Verification (All-Stations Platform Invariant Check)
+With the backend service running, verify unambiguous berth and platform card assignments across all 24 corridor stations (95 platforms):
+```bash
+node scripts/verify-platform-cards.js
+```
+The script asserts the four core platform invariants:
+1. Every displayed occupant has `currentBlockId` matching that platform's interlocked block (`BLK-<STATION>-P<n>`).
+2. Every "Next Waiting" train has `assignedPlatformId` strictly matching that platform's ID.
+3. No train is duplicated across multiple platform cards.
+4. Platform status (`OCCUPIED` vs `CLEAR`) strictly agrees with displayed berth occupancy.
+
 ---
 
 ## Main REST API Endpoints
