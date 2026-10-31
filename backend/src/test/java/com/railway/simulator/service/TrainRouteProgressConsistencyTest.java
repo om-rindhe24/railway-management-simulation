@@ -2,8 +2,6 @@ package com.railway.simulator.service;
 
 import com.railway.simulator.algorithm.CorridorGraph;
 import com.railway.simulator.controller.dto.TrainSnapshotDto;
-import com.railway.simulator.domain.BlockType;
-import com.railway.simulator.domain.TrackBlock;
 import com.railway.simulator.domain.TrainStatus;
 import com.railway.simulator.domain.Train;
 import com.railway.simulator.repository.TrainRepository;

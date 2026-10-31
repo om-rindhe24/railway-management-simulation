@@ -34,9 +34,6 @@ public class PlatformClosureAndFleetTurnaroundIntegrationTest {
     private TrainRepository trainRepository;
 
     @Autowired
-    private PlatformAllocationRepository allocationRepository;
-
-    @Autowired
     private AllocationHistoryRepository historyRepository;
 
     @Autowired

@@ -336,7 +336,6 @@ public class SimulationService {
             String nextSigId = nextBlockId != null ? "SIG-" + nextBlockId.substring(4) : null;
             Signal nextSig = nextSigId != null ? signals.get(nextSigId) : null;
 
-            CorridorGraph.StationNode stnNode = targetStation != null ? corridorGraph.getStation(targetStation) : null;
             boolean stopsAtStation = train.stopsAtStation(targetStation);
 
             boolean isEnteringStation = currentBlock != null && targetStation != null &&
@@ -467,8 +466,6 @@ public class SimulationService {
             String currentBlockId = train.getCurrentBlockId();
             TrackBlock currentBlock = currentBlockId != null ? trackBlocks.get(currentBlockId) : null;
 
-            TrainStatus oldStatus = train.getStatus();
-
             // Status Machine & Continuous Movement
             boolean platformClosedOrOccupied = false;
             if (assignedPlatId != null) {
@@ -481,8 +478,6 @@ public class SimulationService {
                     }
                 }
             }
-
-            boolean isHomeSignalRed = homeSignal != null && homeSignal.getCurrentAspect() == SignalAspect.RED;
 
             if (currentBlockId == null && simulationTime.isBefore(arr)) {
                 // Scheduled in the future
@@ -672,7 +667,6 @@ public class SimulationService {
                 Signal nextSig = nextSigId != null ? signals.get(nextSigId) : null;
 
                 String trainDir = determineTrainDirection(train);
-                CorridorGraph.StationNode stnNode = targetStation != null ? corridorGraph.getStation(targetStation) : null;
                 boolean stopsAtStation = train.stopsAtStation(targetStation);
 
                 boolean isInsidePlatformBlock = currentBlock != null && currentBlock.getBlockType() == BlockType.PLATFORM;

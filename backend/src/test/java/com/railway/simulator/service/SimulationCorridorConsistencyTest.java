@@ -4,9 +4,7 @@ import com.railway.simulator.config.PlatformLineConfig;
 import com.railway.simulator.config.SignalSpeedConfig;
 import com.railway.simulator.config.StoppingPatternConfig;
 import com.railway.simulator.controller.dto.CorridorStateDto;
-import com.railway.simulator.controller.dto.TrainSnapshotDto;
 import com.railway.simulator.domain.*;
-import com.railway.simulator.repository.PlatformAllocationRepository;
 import com.railway.simulator.repository.PlatformRepository;
 import com.railway.simulator.repository.TrainRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,9 +35,6 @@ class SimulationCorridorConsistencyTest {
 
     @Autowired
     private TrainRepository trainRepository;
-
-    @Autowired
-    private PlatformAllocationRepository allocationRepository;
 
     @BeforeEach
     void setup() {

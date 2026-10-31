@@ -15,16 +15,12 @@ public class AnalyticsService {
     private final TrainRepository trainRepository;
     private final PlatformRepository platformRepository;
     private final AllocationHistoryRepository historyRepository;
-    private final PlatformAllocationRepository allocationRepository;
-
     public AnalyticsService(TrainRepository trainRepository,
                             PlatformRepository platformRepository,
-                            AllocationHistoryRepository historyRepository,
-                            PlatformAllocationRepository allocationRepository) {
+                            AllocationHistoryRepository historyRepository) {
         this.trainRepository = trainRepository;
         this.platformRepository = platformRepository;
         this.historyRepository = historyRepository;
-        this.allocationRepository = allocationRepository;
     }
 
     public Map<String, Object> getDashboardKpis() {

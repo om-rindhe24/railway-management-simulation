@@ -9,7 +9,8 @@ import com.railway.simulator.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import com.railway.simulator.algorithm.dto.PlatformScoreResult;
+import com.railway.simulator.config.PlatformLineConfig;
 import java.util.*;
 
 @Service
@@ -303,7 +304,6 @@ public class AllocationService {
             if (dec.isAllocated()) {
                 train.setAssignedPlatformId(dec.getSelectedPlatformId());
                 train.setAssignedPlatformNumber(dec.getSelectedPlatformNumber());
-                String newBlockId = "BLK-" + stationCode.toUpperCase() + "-P" + dec.getSelectedPlatformNumber();
                 String newHomeSigId = "SIG-" + stationCode.toUpperCase() + "-P" + dec.getSelectedPlatformNumber();
                 train.setNextSignalId(newHomeSigId);
                 train.setSignalAspect(SignalAspect.GREEN);
@@ -424,8 +424,8 @@ public class AllocationService {
             // Fell back to a different line type in the same direction
             String sameLineStatus = null;
             if (dec.getCandidateScores() != null) {
-                for (com.railway.simulator.algorithm.dto.PlatformScoreResult score : dec.getCandidateScores()) {
-                    LineType candLine = com.railway.simulator.config.PlatformLineConfig.getPlatformLineType(stationCode, score.getPlatformNumber());
+                for (PlatformScoreResult score : dec.getCandidateScores()) {
+                    LineType candLine = PlatformLineConfig.getPlatformLineType(stationCode, score.getPlatformNumber());
                     if (candLine == preferredLine && (oldPlatform == null || !oldPlatform.equals(score.getPlatformNumber()))) {
                         sameLineStatus = String.format("P%d (same line) occupied", score.getPlatformNumber());
                         break;
