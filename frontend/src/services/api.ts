@@ -1,7 +1,7 @@
 import {
   Station, Platform, Train, PlatformAllocation, AllocationHistory,
   ConflictReport, AllocationDecision, ReallocationResult, SimulationState, AlgorithmInfo,
-  CorridorStateDto
+  CorridorStateDto, WhatIfPreviewResult
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -80,6 +80,16 @@ export const api = {
     fetchJson<PlatformAllocation[]>(stationCode ? `/allocations?stationCode=${stationCode}` : '/allocations'),
   runAllocation: (stationCode: string) =>
     fetchJson<AllocationDecision[]>(`/allocations/run?stationCode=${stationCode}`, { method: 'POST' }),
+  previewTrainDelay: (trainId: number, delayMinutes: number, reason: string) =>
+    fetchJson<WhatIfPreviewResult>(`/allocations/what-if/trains/${trainId}/delay`, {
+      method: 'POST',
+      body: JSON.stringify({ delayMinutes, reason }),
+    }),
+  previewPlatformClosure: (platformId: number, reason: string) =>
+    fetchJson<WhatIfPreviewResult>(`/allocations/what-if/platforms/${platformId}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
   getConflicts: (stationCode: string) =>
     fetchJson<ConflictReport[]>(`/allocations/conflicts?stationCode=${stationCode}`),
   getAllocationHistory: (stationCode?: string) =>

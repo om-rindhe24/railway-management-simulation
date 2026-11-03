@@ -3,12 +3,16 @@ package com.railway.simulator.controller;
 import com.railway.simulator.algorithm.dto.AllocationDecision;
 import com.railway.simulator.algorithm.dto.ConflictReport;
 import com.railway.simulator.controller.dto.ApiResponse;
+import com.railway.simulator.controller.dto.PlatformClosureRequest;
+import com.railway.simulator.controller.dto.TrainDelayRequest;
+import com.railway.simulator.controller.dto.WhatIfPreviewResult;
 import com.railway.simulator.controller.validation.StationValidationUtil;
 import com.railway.simulator.domain.AllocationHistory;
 import com.railway.simulator.domain.PlatformAllocation;
 import com.railway.simulator.domain.SimulationEvent;
 import com.railway.simulator.repository.SimulationEventRepository;
 import com.railway.simulator.service.AllocationService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -77,5 +81,23 @@ public class AllocationController {
             events = events.stream().filter(e -> eventType.equalsIgnoreCase(e.getEventType())).toList();
         }
         return ResponseEntity.ok(ApiResponse.ok("Retrieved simulation events", events));
+    }
+
+    @PostMapping("/allocations/what-if/trains/{trainId}/delay")
+    public ResponseEntity<ApiResponse<WhatIfPreviewResult>> previewTrainDelay(
+            @PathVariable Long trainId,
+            @Valid @RequestBody TrainDelayRequest request) {
+        WhatIfPreviewResult result = allocationService.previewTrainDelay(
+                trainId, request.getDelayMinutes(), request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok("What-If delay cascade evaluated (isolated simulation)", result));
+    }
+
+    @PostMapping("/allocations/what-if/platforms/{platformId}/close")
+    public ResponseEntity<ApiResponse<WhatIfPreviewResult>> previewPlatformClosure(
+            @PathVariable Long platformId,
+            @Valid @RequestBody PlatformClosureRequest request) {
+        WhatIfPreviewResult result = allocationService.previewPlatformClosure(
+                platformId, request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok("What-If platform closure evaluated (isolated simulation)", result));
     }
 }

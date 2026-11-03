@@ -189,6 +189,33 @@ export interface ReallocationResult {
   summaryMessage: string;
 }
 
+export interface WhatIfTrainDiff {
+  trainId: number;
+  trainNumber: string;
+  trainName: string;
+  beforePlatformNumber?: number;
+  afterPlatformNumber?: number;
+  beforeDelayMinutes: number;
+  afterDelayMinutes: number;
+  beforeStatus: string;
+  afterStatus: string;
+  decisionReason: string;
+  isHeld: boolean;
+  isReallocated: boolean;
+}
+
+export interface WhatIfPreviewResult {
+  isolatedCopy: boolean;
+  totalAffectedTrains: number;
+  reallocatedCount: number;
+  conflictsResolved: number;
+  additionalDelayMinutes: number;
+  heldCount: number;
+  summaryMessage: string;
+  reallocationResult: ReallocationResult;
+  diffs: WhatIfTrainDiff[];
+}
+
 export interface SimulationState {
   simulationTime: string;
   running: boolean;

@@ -11,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.railway.simulator.algorithm.dto.PlatformScoreResult;
 import com.railway.simulator.config.PlatformLineConfig;
+import com.railway.simulator.controller.dto.WhatIfPreviewResult;
+import com.railway.simulator.controller.dto.WhatIfTrainDiff;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class AllocationService {
@@ -443,5 +446,250 @@ public class AllocationService {
                         sameLineStatus, newPlatform, newLine);
             }
         }
+    }
+
+    /**
+     * Previews the operational impact of a train delay on an isolated copy of simulation data.
+     * Does NOT mutate database state or simulation state.
+     */
+    @Transactional(readOnly = true)
+    public WhatIfPreviewResult previewTrainDelay(Long trainId, int delayMinutes, String reason) {
+        Train train = trainRepository.findById(trainId)
+                .orElseThrow(() -> new IllegalArgumentException("Train not found: " + trainId));
+
+        String stationCode = train.getTargetStationCode() != null ? train.getTargetStationCode() : "BVI";
+        List<Platform> realPlatforms = platformRepository.findByStationCodeOrderByPlatformNumberAsc(stationCode);
+        List<Train> realTrains = trainRepository.findByTargetStationCode(stationCode);
+        List<PlatformAllocation> realAllocations = allocationRepository.findByStationCodeAndStatus(stationCode, AllocationStatus.ACTIVE);
+
+        // Create isolated copies
+        List<Platform> clonedPlatforms = realPlatforms.stream().map(this::clonePlatform).toList();
+        List<Train> clonedTrains = realTrains.stream().map(this::cloneTrain).toList();
+        List<PlatformAllocation> clonedAllocations = realAllocations.stream().map(this::cloneAllocation).toList();
+
+        Train targetTrain = clonedTrains.stream()
+                .filter(t -> t.getTrainId().equals(trainId))
+                .findFirst()
+                .orElse(cloneTrain(train));
+
+        Map<Long, Train> originalTrainMap = realTrains.stream().collect(Collectors.toMap(Train::getTrainId, t -> t, (a, b) -> a));
+        if (!originalTrainMap.containsKey(train.getTrainId())) {
+            originalTrainMap.put(train.getTrainId(), train);
+        }
+
+        ReallocationResult result = reallocationEngine.handleTrainDelay(
+                targetTrain,
+                delayMinutes,
+                clonedPlatforms,
+                clonedTrains,
+                clonedAllocations
+        );
+
+        return buildWhatIfPreviewResult(result, originalTrainMap, targetTrain, delayMinutes);
+    }
+
+    /**
+     * Previews the operational impact of a platform closure on an isolated copy of simulation data.
+     * Does NOT mutate database state or simulation state.
+     */
+    @Transactional(readOnly = true)
+    public WhatIfPreviewResult previewPlatformClosure(Long platformId, String reason) {
+        Platform platform = platformRepository.findById(platformId)
+                .orElseThrow(() -> new IllegalArgumentException("Platform not found: " + platformId));
+
+        String stationCode = platform.getStationCode();
+        List<Platform> realPlatforms = platformRepository.findByStationCodeOrderByPlatformNumberAsc(stationCode);
+        List<Train> realTrains = trainRepository.findByTargetStationCode(stationCode);
+        List<PlatformAllocation> realAllocations = allocationRepository.findByStationCodeAndStatus(stationCode, AllocationStatus.ACTIVE);
+
+        // Create isolated copies
+        List<Platform> clonedPlatforms = realPlatforms.stream().map(this::clonePlatform).toList();
+        List<Train> clonedTrains = realTrains.stream().map(this::cloneTrain).toList();
+        List<PlatformAllocation> clonedAllocations = realAllocations.stream().map(this::cloneAllocation).toList();
+
+        Platform targetPlatform = clonedPlatforms.stream()
+                .filter(p -> p.getPlatformId().equals(platformId))
+                .findFirst()
+                .orElse(clonePlatform(platform));
+
+        Map<Long, Train> originalTrainMap = realTrains.stream().collect(Collectors.toMap(Train::getTrainId, t -> t, (a, b) -> a));
+
+        ReallocationResult result = reallocationEngine.handlePlatformClosure(
+                targetPlatform.getPlatformId(),
+                targetPlatform.getPlatformNumber(),
+                stationCode,
+                clonedPlatforms,
+                clonedTrains,
+                clonedAllocations
+        );
+
+        return buildWhatIfPreviewResult(result, originalTrainMap, null, 0);
+    }
+
+    private WhatIfPreviewResult buildWhatIfPreviewResult(ReallocationResult result,
+                                                        Map<Long, Train> originalTrainMap,
+                                                        Train perturbedTrain,
+                                                        int perturbationDelay) {
+        WhatIfPreviewResult preview = new WhatIfPreviewResult();
+        preview.setIsolatedCopy(true);
+        preview.setReallocationResult(result);
+        preview.setTotalAffectedTrains(result.getTotalAffectedTrains());
+        preview.setReallocatedCount(result.getReallocatedCount());
+        preview.setConflictsResolved(result.getConflictsResolved());
+        preview.setAdditionalDelayMinutes(result.getAdditionalDelayMinutes());
+        preview.setSummaryMessage(result.getSummaryMessage());
+
+        List<WhatIfTrainDiff> diffs = new ArrayList<>();
+        int heldCount = 0;
+
+        if (result.getReallocationDecisions() != null) {
+            for (AllocationDecision dec : result.getReallocationDecisions()) {
+                Train orig = originalTrainMap.get(dec.getTrainId());
+                String tNum = orig != null ? orig.getTrainNumber() : dec.getTrainNumber();
+                String tName = orig != null ? orig.getTrainName() : dec.getTrainName();
+                Integer beforePlat = orig != null ? orig.getAssignedPlatformNumber() : null;
+                Integer afterPlat = dec.isAllocated() ? dec.getSelectedPlatformNumber() : null;
+                int beforeDelay = orig != null && orig.getDelayMinutes() != null ? orig.getDelayMinutes() : 0;
+                int afterDelay = dec.getEstimatedDelayMinutes();
+                if (perturbedTrain != null && perturbedTrain.getTrainId().equals(dec.getTrainId())) {
+                    afterDelay = Math.max(afterDelay, beforeDelay + perturbationDelay);
+                }
+                String beforeStatus = orig != null && orig.getStatus() != null ? orig.getStatus().name() : "SCHEDULED";
+                String afterStatus;
+                boolean isHeld = false;
+                boolean isReallocated = false;
+
+                if (!dec.isAllocated()) {
+                    afterStatus = "HELD";
+                    isHeld = true;
+                    heldCount++;
+                } else if (beforePlat != null && !beforePlat.equals(afterPlat)) {
+                    afterStatus = "REALLOCATED";
+                    isReallocated = true;
+                } else {
+                    afterStatus = "CONFIRMED";
+                }
+
+                diffs.add(new WhatIfTrainDiff(
+                        dec.getTrainId(),
+                        tNum,
+                        tName,
+                        beforePlat,
+                        afterPlat,
+                        beforeDelay,
+                        afterDelay,
+                        beforeStatus,
+                        afterStatus,
+                        dec.getDetailedBreakdown() != null ? dec.getDetailedBreakdown() : dec.getPrimaryReason(),
+                        isHeld,
+                        isReallocated
+                ));
+            }
+        }
+
+        if (perturbedTrain != null && diffs.stream().noneMatch(d -> d.getTrainId().equals(perturbedTrain.getTrainId()))) {
+            Train orig = originalTrainMap.get(perturbedTrain.getTrainId());
+            int beforeDelay = orig != null && orig.getDelayMinutes() != null ? orig.getDelayMinutes() : 0;
+            Integer plat = orig != null ? orig.getAssignedPlatformNumber() : null;
+            String beforeStatus = orig != null && orig.getStatus() != null ? orig.getStatus().name() : "SCHEDULED";
+            diffs.add(0, new WhatIfTrainDiff(
+                    perturbedTrain.getTrainId(),
+                    perturbedTrain.getTrainNumber(),
+                    perturbedTrain.getTrainName(),
+                    plat,
+                    plat,
+                    beforeDelay,
+                    beforeDelay + perturbationDelay,
+                    beforeStatus,
+                    beforeStatus.equals("SCHEDULED") ? "DELAYED" : beforeStatus,
+                    "Injected perturbation delay of +" + perturbationDelay + " min (no platform conflicts triggered)",
+                    false,
+                    false
+            ));
+        }
+
+        preview.setHeldCount(heldCount);
+        preview.setDiffs(diffs);
+        return preview;
+    }
+
+    private Train cloneTrain(Train src) {
+        Train copy = new Train();
+        copy.setTrainId(src.getTrainId());
+        copy.setTrainNumber(src.getTrainNumber());
+        copy.setTrainName(src.getTrainName());
+        copy.setTrainType(src.getTrainType());
+        copy.setTrainCategory(src.getTrainCategory());
+        copy.setStopStationsStr(src.getStopStationsStr());
+        if (src.getStopStations() != null) {
+            copy.setStopStations(new ArrayList<>(src.getStopStations()));
+        }
+        copy.setNextStopStationCode(src.getNextStopStationCode());
+        copy.setSourceStation(src.getSourceStation());
+        copy.setDestinationStation(src.getDestinationStation());
+        copy.setSimulationPriority(src.getSimulationPriority());
+        copy.setScheduledArrival(src.getScheduledArrival());
+        copy.setScheduledDeparture(src.getScheduledDeparture());
+        copy.setActualArrival(src.getActualArrival());
+        copy.setActualDeparture(src.getActualDeparture());
+        copy.setDelayMinutes(src.getDelayMinutes());
+        copy.setStatus(src.getStatus());
+        copy.setCurrentStationCode(src.getCurrentStationCode());
+        copy.setNextStationCode(src.getNextStationCode());
+        copy.setLastStationCode(src.getLastStationCode());
+        copy.setUpcomingStationCode(src.getUpcomingStationCode());
+        copy.setDirection(src.getDirection());
+        copy.setTargetStationCode(src.getTargetStationCode());
+        copy.setAssignedPlatformId(src.getAssignedPlatformId());
+        copy.setAssignedPlatformNumber(src.getAssignedPlatformNumber());
+        copy.setCurrentBlockId(src.getCurrentBlockId());
+        copy.setNextSignalId(src.getNextSignalId());
+        copy.setSignalAspect(src.getSignalAspect());
+        copy.setWaitingReason(src.getWaitingReason());
+        copy.setProgressPercent(src.getProgressPercent());
+        copy.setSpeedKmH(src.getSpeedKmH());
+        copy.setIsActive(src.getIsActive());
+        copy.setIsSimulated(src.getIsSimulated());
+        return copy;
+    }
+
+    private Platform clonePlatform(Platform src) {
+        Platform copy = new Platform();
+        copy.setPlatformId(src.getPlatformId());
+        copy.setStationCode(src.getStationCode());
+        copy.setPlatformNumber(src.getPlatformNumber());
+        copy.setLineType(src.getLineType());
+        if (src.getSupportedTrainTypes() != null) {
+            copy.setSupportedTrainTypes(new HashSet<>(src.getSupportedTrainTypes()));
+        }
+        copy.setIsOccupied(src.getIsOccupied());
+        copy.setIsClosed(src.getIsClosed());
+        copy.setClosureReason(src.getClosureReason());
+        copy.setCurrentTrainId(src.getCurrentTrainId());
+        copy.setCurrentTrainNumber(src.getCurrentTrainNumber());
+        copy.setOccupancyStart(src.getOccupancyStart());
+        copy.setOccupancyEnd(src.getOccupancyEnd());
+        copy.setDirection(src.getDirection());
+        return copy;
+    }
+
+    private PlatformAllocation cloneAllocation(PlatformAllocation src) {
+        PlatformAllocation copy = new PlatformAllocation();
+        copy.setAllocationId(src.getAllocationId());
+        copy.setTrainId(src.getTrainId());
+        copy.setTrainNumber(src.getTrainNumber());
+        copy.setTrainName(src.getTrainName());
+        copy.setPlatformId(src.getPlatformId());
+        copy.setPlatformNumber(src.getPlatformNumber());
+        copy.setStationId(src.getStationId());
+        copy.setStationCode(src.getStationCode());
+        copy.setStartTime(src.getStartTime());
+        copy.setEndTime(src.getEndTime());
+        copy.setAllocatedAt(src.getAllocatedAt());
+        copy.setStatus(src.getStatus());
+        copy.setSelectionReason(src.getSelectionReason());
+        copy.setScoringBreakdown(src.getScoringBreakdown());
+        copy.setDelayMinutes(src.getDelayMinutes());
+        return copy;
     }
 }
