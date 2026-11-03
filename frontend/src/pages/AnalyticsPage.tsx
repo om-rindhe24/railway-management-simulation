@@ -378,6 +378,31 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ kpis, onRefresh })
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ background: 'var(--bg-primary)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: (kpis?.signalsPassedAtDanger ?? 0) === 0 ? 'var(--color-success)' : '#ef4444', fontSize: '0.9rem' }}>
+                  Signals Passed At Danger (SPAD)
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    background: (kpis?.signalsPassedAtDanger ?? 0) === 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.2)',
+                    color: (kpis?.signalsPassedAtDanger ?? 0) === 0 ? 'var(--color-success)' : '#ef4444',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${(kpis?.signalsPassedAtDanger ?? 0) === 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.4)'}`,
+                  }}
+                >
+                  {kpis?.signalsPassedAtDanger ?? 0} (Expected: 0)
+                </span>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Strict stop-line interlocking prevents trains from entering blocks protected by RED signals at any simulation speed multiplier.
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-primary)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
               <div style={{ fontWeight: 700, color: 'var(--color-success)', fontSize: '0.9rem' }}>
                 Zero Platform Head-On Collisions
               </div>

@@ -113,6 +113,7 @@ public class AnalyticsService {
 
         kpis.put("conflictsResolved", totalConflictsResolved);
         kpis.put("totalReallocations", totalReallocations);
+        kpis.put("signalsPassedAtDanger", simulationService != null ? simulationService.getSignalsPassedAtDanger() : 0L);
         kpis.put("isPeakHour", simulationService != null && simulationService.isPeakHour());
 
         // Train category distribution

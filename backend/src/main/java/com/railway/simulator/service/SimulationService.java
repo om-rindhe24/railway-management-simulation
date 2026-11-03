@@ -34,7 +34,45 @@ public class SimulationService {
     private boolean isRunning = false;
     private int speedMultiplier = 1;
     private boolean isPeakHour = false;
+    private long signalsPassedAtDanger = 0L;
     private final Deque<PlatformStateSlice> platformHistory = new ConcurrentLinkedDeque<>();
+
+    public static class BlockTransitionRecord {
+        public final String trainNumber;
+        public final String fromBlock;
+        public final String toBlock;
+        public final SignalAspect aspect;
+        public final double speedKmH;
+        public final boolean isSpad;
+
+        public BlockTransitionRecord(String trainNumber, String fromBlock, String toBlock,
+                                     SignalAspect aspect, double speedKmH, boolean isSpad) {
+            this.trainNumber = trainNumber;
+            this.fromBlock = fromBlock;
+            this.toBlock = toBlock;
+            this.aspect = aspect;
+            this.speedKmH = speedKmH;
+            this.isSpad = isSpad;
+        }
+    }
+
+    private final List<BlockTransitionRecord> transitionLog = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public List<BlockTransitionRecord> getTransitionLog() {
+        return new ArrayList<>(transitionLog);
+    }
+
+    public void clearTransitionLog() {
+        transitionLog.clear();
+    }
+
+    public synchronized void recordSignalPassedAtDanger() {
+        this.signalsPassedAtDanger++;
+    }
+
+    public synchronized long getSignalsPassedAtDanger() {
+        return this.signalsPassedAtDanger;
+    }
 
     private final TrainRepository trainRepository;
     private final PlatformRepository platformRepository;
@@ -120,6 +158,8 @@ public class SimulationService {
         this.speedMultiplier = 1;
         this.simulationTime = LocalDateTime.of(2026, 9, 18, 10, 0, 0);
         this.isPeakHour = false;
+        this.signalsPassedAtDanger = 0L;
+        this.transitionLog.clear();
         this.platformHistory.clear();
 
         // Reset track blocks
@@ -286,6 +326,14 @@ public class SimulationService {
         List<Platform> platforms = platformRepository.findAll();
         Map<String, Platform> platformMap = new HashMap<>();
 
+        List<Train> activeTrains = trainRepository.findByIsActiveTrue();
+        Map<String, Train> trainsOnBlocks = new HashMap<>();
+        for (Train t : activeTrains) {
+            if (t.getStatus() != TrainStatus.DEPARTED && t.getCurrentBlockId() != null) {
+                trainsOnBlocks.put(t.getCurrentBlockId(), t);
+            }
+        }
+
         for (Platform p : platforms) {
             String code = p.getStationCode();
             if (code != null) {
@@ -295,9 +343,16 @@ public class SimulationService {
                 TrackBlock tb = trackBlocks.get(pBlockId);
                 if (tb != null) {
                     tb.setClosed(p.getIsClosed());
-                    tb.setOccupied(p.getIsOccupied());
-                    tb.setOccupyingTrainNumber(p.getCurrentTrainNumber());
-                    tb.setOccupyingTrainId(p.getCurrentTrainId());
+                    Train occupyingTrain = trainsOnBlocks.get(pBlockId);
+                    if (occupyingTrain != null) {
+                        tb.setOccupied(true);
+                        tb.setOccupyingTrainNumber(occupyingTrain.getTrainNumber());
+                        tb.setOccupyingTrainId(occupyingTrain.getTrainId());
+                    } else {
+                        tb.setOccupied(p.getIsOccupied());
+                        tb.setOccupyingTrainNumber(p.getCurrentTrainNumber());
+                        tb.setOccupyingTrainId(p.getCurrentTrainId());
+                    }
                 }
             }
         }
@@ -482,7 +537,7 @@ public class SimulationService {
         for (Train train : trains) {
             if (train.getStatus() == TrainStatus.DEPARTED) {
                 if (train.getActualDeparture() == null || !simulationTime.isBefore(train.getActualDeparture().plusSeconds(30))) {
-                    executeTrainTurnaround(train);
+                    executeTrainTurnaround(train, claimedStationPlatforms);
                 }
                 continue;
             }
@@ -722,6 +777,7 @@ public class SimulationService {
                                     newBlk.occupy(train.getTrainId(), train.getTrainNumber());
                                     train.setCurrentStationCode(newBlk.getFromStationCode());
                                     train.setNextStationCode(newBlk.getToStationCode());
+                                    recalculateSignalling();
                                 }
                             }
                         }
@@ -874,6 +930,8 @@ public class SimulationService {
                 // Resume moving if train was WAITING and signal ahead is now clear
                 if (train.getStatus() == TrainStatus.WAITING && !isAheadRed) {
                     train.setStatus(TrainStatus.APPROACHING);
+                    SignalAspect newAspect = aheadSignal != null ? aheadSignal.getCurrentAspect() : SignalAspect.GREEN;
+                    train.setSignalAspect(newAspect);
                     train.setWaitingReason(null);
                 }
 
@@ -912,7 +970,7 @@ public class SimulationService {
 
                             // Compute braking distance required to stop from current speed: d = v^2 / (2 * a)
                             double vMS = currentSpeed / 3.6;
-                            double dBrakeMeters = (vMS * vMS) / (2.0 * SignalSpeedConfig.BRAKING_M_S2);
+                            double dBrakeMeters = (vMS * vMS) / (2.0 * SignalSpeedConfig.BRAKING_M_S2) * 1.3 + 50.0;
 
                             double targetSpeed;
                             if (dRemMeters <= dBrakeMeters) {
@@ -931,7 +989,7 @@ public class SimulationService {
                             double deltaPct = (distKm / blockKm) * 100.0;
                             currentProgress = Math.min(stopTarget, currentProgress + deltaPct);
 
-                            if (currentProgress >= stopTarget || (dRemMeters <= 2.0 && currentSpeed <= 0.5)) {
+                            if (currentProgress >= stopTarget || currentSpeed <= 0.0 || (dRemMeters <= 5.0 && currentSpeed <= 2.0)) {
                                 currentProgress = stopTarget;
                                 currentSpeed = 0.0;
                                 boolean wasWaiting = train.getStatus() == TrainStatus.WAITING;
@@ -952,14 +1010,16 @@ public class SimulationService {
                             train.setStatus(TrainStatus.APPROACHING);
                             train.setSpeedKmH(currentSpeed);
                             train.setProgressPercent(currentProgress);
-                            train.setSignalAspect(SignalAspect.RED);
                             train.setNextSignalId(aheadSignalId);
                             train.setWaitingReason(null);
                         } else {
                             // Ahead signal is permissive (GREEN, DOUBLE_YELLOW, or YELLOW)
-                            SignalAspect aspect = aheadSignal != null ? aheadSignal.getCurrentAspect() : SignalAspect.GREEN;
+                            SignalAspect governingAspect = train.getSignalAspect() != null ? train.getSignalAspect() : SignalAspect.GREEN;
                             double trainMax = SignalSpeedConfig.getMaxSpeed(train, currentBlock);
-                            double targetSpeed = SignalSpeedConfig.getAspectSpeedLimit(aspect, trainMax);
+                            double governingLimit = SignalSpeedConfig.getAspectSpeedLimit(governingAspect, trainMax);
+                            double targetSpeed = governingLimit;
+
+                            SignalAspect aheadAspect = aheadSignal != null ? aheadSignal.getCurrentAspect() : SignalAspect.GREEN;
 
                             double dRemToStationMeters = (currentBlock != null && blockKm > 0)
                                     ? Math.max(0.0, (100.0 - currentProgress) / 100.0 * blockKm * 1000.0) : 0.0;
@@ -974,6 +1034,17 @@ public class SimulationService {
                                 }
                             } else if (isInsidePlatformBlock) {
                                 targetSpeed = 0.0;
+                            } else if (aheadAspect == SignalAspect.YELLOW || aheadAspect == SignalAspect.DOUBLE_YELLOW) {
+                                // Downstream lookahead deceleration towards restrictive signal ahead
+                                double targetAspectSpeed = SignalSpeedConfig.getAspectSpeedLimit(aheadAspect, trainMax);
+                                double vTargetMS = targetAspectSpeed / 3.6;
+                                double curVMS = currentSpeed / 3.6;
+                                if (curVMS > vTargetMS) {
+                                    double dBrakeMeters = Math.max(0.0, (curVMS * curVMS - vTargetMS * vTargetMS) / (2.0 * SignalSpeedConfig.BRAKING_M_S2)) * 1.3 + 50.0;
+                                    if (dRemToStationMeters <= dBrakeMeters) {
+                                        targetSpeed = Math.min(targetSpeed, targetAspectSpeed);
+                                    }
+                                }
                             }
 
                             double stepStartSpeed = currentSpeed;
@@ -1056,6 +1127,11 @@ public class SimulationService {
                                 currentProgress = 0.0;
                                 blockKm = (pBlock.getLengthKm() > 0) ? pBlock.getLengthKm() : 0.8;
 
+                                SignalAspect entryAspect = homeSignal != null ? homeSignal.getCurrentAspect() : SignalAspect.GREEN;
+                                boolean isSpad = entryAspect == SignalAspect.RED;
+                                if (isSpad) recordSignalPassedAtDanger();
+                                transitionLog.add(new BlockTransitionRecord(train.getTrainNumber(), currentBlock != null ? currentBlock.getBlockId() : null, targetPlatformBlockId, entryAspect, currentSpeed, isSpad));
+
                                 double brakeApplied = Math.max(0.0, stepStartSpeed - currentSpeed);
                                 double maxBrake = secondsAdvanced * SignalSpeedConfig.BRAKE_KMH_PER_SEC;
                                 double remainingBrakeAllowed = Math.max(0.0, maxBrake - brakeApplied);
@@ -1101,9 +1177,32 @@ public class SimulationService {
                                 }
                             } else if (newProgress >= 100.0) {
                                 if (nextBlockId != null && trackBlocks.containsKey(nextBlockId)) {
-                                    // Move to next inter-station block
-                                    if (currentBlock != null) currentBlock.vacate();
                                     TrackBlock nextBlock = trackBlocks.get(nextBlockId);
+                                    boolean isNextBlocked = (nextSig != null && nextSig.getCurrentAspect() == SignalAspect.RED) ||
+                                            (nextBlock != null && (nextBlock.isClosed() || (nextBlock.isOccupied() && !train.getTrainId().equals(nextBlock.getOccupyingTrainId()))));
+
+                                    if (isNextBlocked) {
+                                        currentProgress = SignalSpeedConfig.STOP_PROGRESS_PERCENT;
+                                        currentSpeed = 0.0;
+                                        train.setStatus(TrainStatus.WAITING);
+                                        train.setSpeedKmH(0.0);
+                                        train.setProgressPercent(currentProgress);
+                                        train.setSignalAspect(SignalAspect.RED);
+                                        train.setNextSignalId(nextSigId);
+                                        train.setWaitingReason(nextSig != null && nextSig.getAspectReason() != null
+                                                ? nextSig.getAspectReason()
+                                                : "Waiting at signal: block " + nextBlockId + " occupied/closed");
+                                        if (currentBlock != null) currentBlock.occupy(train.getTrainId(), train.getTrainNumber());
+                                        break;
+                                    }
+
+                                    // Move to next inter-station block
+                                    SignalAspect enteredAspect = nextSig != null ? nextSig.getCurrentAspect() : SignalAspect.GREEN;
+                                    double enteredSpeedLimit = SignalSpeedConfig.getAspectSpeedLimit(enteredAspect, trainMax);
+                                    currentSpeed = Math.min(currentSpeed, enteredSpeedLimit);
+                                    train.setSpeedKmH(currentSpeed);
+
+                                    if (currentBlock != null) currentBlock.vacate();
                                     nextBlock.occupy(train.getTrainId(), train.getTrainNumber());
                                     train.setCurrentBlockId(nextBlockId);
                                     currentBlock = nextBlock;
@@ -1121,6 +1220,12 @@ public class SimulationService {
                                     }
                                     blockKm = (nextBlock.getLengthKm() > 0) ? nextBlock.getLengthKm() : 2.5;
 
+                                    boolean isSpad = enteredAspect == SignalAspect.RED;
+                                    if (isSpad) recordSignalPassedAtDanger();
+                                    transitionLog.add(new BlockTransitionRecord(train.getTrainNumber(), currentBlock != null ? currentBlock.getBlockId() : null, nextBlockId, enteredAspect, currentSpeed, isSpad));
+
+                                    recalculateSignalling();
+
                                     // Refresh downstream lookahead for the newly entered block
                                     nextBlockId = currentBlock.getNextBlockId();
                                     nextSigId = nextBlockId != null ? "SIG-" + nextBlockId.substring(4) : null;
@@ -1130,18 +1235,18 @@ public class SimulationService {
                                     aheadSignalId = (isEnteringStation && homeSignal != null) ? homeSignalId : nextSigId;
                                     isAheadRed = (aheadSignal != null && aheadSignal.getCurrentAspect() == SignalAspect.RED) ||
                                             (isEnteringStation && platformClosedOrOccupied);
-                                    train.setSignalAspect(aheadSignal != null ? aheadSignal.getCurrentAspect() : SignalAspect.GREEN);
+                                    train.setSignalAspect(enteredAspect);
                                     train.setNextSignalId(aheadSignalId);
                                     train.setWaitingReason(null);
                                 } else {
                                     // End of corridor route
                                     if (currentBlock != null) currentBlock.vacate();
                                     train.setStatus(TrainStatus.DEPARTED);
-                                    // Keep currentBlockId so it has a valid drawable position at terminal for 30s
                                     train.setProgressPercent(100.0);
                                     train.setSpeedKmH(0.0);
                                     train.setActualDeparture(simulationTime);
                                     train.setWaitingReason("Reached end of corridor");
+                                    recalculateSignalling();
                                     break;
                                 }
                             } else {
@@ -1149,10 +1254,8 @@ public class SimulationService {
                                 train.setProgressPercent(currentProgress);
                                 train.setSpeedKmH(currentSpeed);
                                 train.setStatus(TrainStatus.APPROACHING);
-                                train.setSignalAspect(aheadSignal != null ? aheadSignal.getCurrentAspect() : SignalAspect.GREEN);
                                 train.setNextSignalId(aheadSignalId);
                                 train.setWaitingReason(null);
-                                if (currentBlock != null) currentBlock.occupy(train.getTrainId(), train.getTrainNumber());
                             }
                         }
                     }
@@ -1449,7 +1552,7 @@ public class SimulationService {
         return dto;
     }
 
-    private void executeTrainTurnaround(Train train) {
+    private void executeTrainTurnaround(Train train, Set<String> claimedStationPlatforms) {
         String tgtUpper = train.getTargetStationCode() != null ? train.getTargetStationCode() :
                 (train.getCurrentStationCode() != null ? train.getCurrentStationCode() :
                         ("UP".equalsIgnoreCase(determineTrainDirection(train)) ? "MMCT" : "VR"));
@@ -1468,12 +1571,17 @@ public class SimulationService {
         Platform turnaroundPlat = null;
         for (Platform p : stationPlatforms) {
             if (p.getLineType() == targetLineType && !Boolean.TRUE.equals(p.getIsClosed())) {
+                String candKey = tgtUpper.toUpperCase() + "-P" + p.getPlatformNumber();
+                if (claimedStationPlatforms != null && claimedStationPlatforms.contains(candKey)) {
+                    continue;
+                }
                 boolean pFree = !Boolean.TRUE.equals(p.getIsOccupied()) || train.getTrainId().equals(p.getCurrentTrainId());
                 String pBlockId = "BLK-" + tgtUpper + "-P" + p.getPlatformNumber();
                 TrackBlock tb = trackBlocks.get(pBlockId);
                 boolean tbFree = tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()));
                 if (pFree && tbFree) {
                     turnaroundPlat = p;
+                    if (claimedStationPlatforms != null) claimedStationPlatforms.add(candKey);
                     break;
                 }
             }
@@ -1485,12 +1593,17 @@ public class SimulationService {
         if (turnaroundPlat == null && !isLongDistance) {
             for (Platform p : stationPlatforms) {
                 if (!Boolean.TRUE.equals(p.getIsClosed()) && (newDir.equalsIgnoreCase(p.getDirection()) || "COMMON".equalsIgnoreCase(p.getDirection()))) {
+                    String candKey = tgtUpper.toUpperCase() + "-P" + p.getPlatformNumber();
+                    if (claimedStationPlatforms != null && claimedStationPlatforms.contains(candKey)) {
+                        continue;
+                    }
                     boolean pFree = !Boolean.TRUE.equals(p.getIsOccupied()) || train.getTrainId().equals(p.getCurrentTrainId());
                     String pBlockId = "BLK-" + tgtUpper + "-P" + p.getPlatformNumber();
                     TrackBlock tb = trackBlocks.get(pBlockId);
                     boolean tbFree = tb != null && (!tb.isOccupied() || train.getTrainId().equals(tb.getOccupyingTrainId()));
                     if (pFree && tbFree) {
                         turnaroundPlat = p;
+                        if (claimedStationPlatforms != null) claimedStationPlatforms.add(candKey);
                         break;
                     }
                 }
@@ -1498,6 +1611,7 @@ public class SimulationService {
         }
         if (turnaroundPlat == null) {
             train.setStatus(TrainStatus.DEPARTED);
+            train.setCurrentBlockId(null);
             train.setActualDeparture(simulationTime != null ? simulationTime.plusSeconds(30) : LocalDateTime.now().plusSeconds(30));
             trainRepository.save(train);
             return;
@@ -1545,6 +1659,7 @@ public class SimulationService {
         train.setNextStopStationCode(rp.getNextStopStationCode());
 
         trainRepository.save(train);
+        recalculateSignalling();
 
         eventRepository.save(new SimulationEvent("TRAIN_TURNAROUND", Severity.INFO,
                 String.format("Train %s turnaround at %s: reversed to %s toward %s on P%s",
@@ -1581,6 +1696,7 @@ public class SimulationService {
                 t.setProgressPercent(spec.progress);
                 t.setSpeedKmH(spec.speed);
                 t.setStatus(TrainStatus.APPROACHING);
+                t.setSignalAspect(SignalAspect.GREEN);
                 t.setIsActive(true);
                 t.setDelayMinutes(0);
 
