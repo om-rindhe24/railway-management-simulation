@@ -10,6 +10,7 @@ import {
   BarChart3,
   ShieldCheck,
   Radar,
+  Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'trains', label: 'Train Management', icon: TrainIcon },
     { id: 'history', label: 'Allocation History', icon: History },
     { id: 'analytics', label: 'Operations Analytics', icon: BarChart3 },
+    { id: 'landing', label: 'Landing Intro', icon: Sparkles },
   ];
 
   return (

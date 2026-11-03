@@ -36,3 +36,7 @@ desktop.ini
 scratch*
 **/scratch*
 .system_generated/
+
+# Large Media Files (>20MB)
+*.mp4
+frontend/public/media/*.mp4

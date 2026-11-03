@@ -25,19 +25,66 @@ import { TrainManagement } from './pages/TrainManagement';
 import { AllocationHistoryPage } from './pages/AllocationHistoryPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { DemoWalkthroughModal } from './components/DemoWalkthroughModal';
+import { ScrollVideoHero } from './components/landing/ScrollVideoHero';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>(() => window.location.hash.replace('#', '') || 'dashboard');
+  const isIntroSkippedByUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('intro') === '0';
+  const hasSeenIntroInSession = () => {
+    try {
+      return sessionStorage.getItem('railflow_intro_seen') === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const [showLanding, setShowLanding] = useState<boolean>(() => {
+    if (isIntroSkippedByUrl) return false;
+    const initialHash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
+    if (initialHash === 'landing') return true;
+    return !hasSeenIntroInSession();
+  });
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const initialHash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
+    return (initialHash && initialHash !== 'landing') ? initialHash : 'dashboard';
+  });
   const [selectedStation, setSelectedStation] = useState<string>('BVI');
   const [isLightMode, setIsLightMode] = useState<boolean>(() => {
     return localStorage.getItem('railway_theme') === 'light';
   });
   const [isDemoModalOpen, setIsDemoModalOpen] = useState<boolean>(false);
 
+  const handleEnterApp = useCallback(() => {
+    try {
+      sessionStorage.setItem('railflow_intro_seen', 'true');
+    } catch {}
+    setShowLanding(false);
+    setActiveTab('dashboard');
+    if (window.location.hash === '#landing') {
+      window.location.hash = 'dashboard';
+    }
+  }, []);
+
+  const handleTabChange = useCallback((tab: string) => {
+    if (tab === 'landing') {
+      setShowLanding(true);
+      window.location.hash = 'landing';
+    } else {
+      setShowLanding(false);
+      setActiveTab(tab);
+      window.location.hash = tab;
+    }
+  }, []);
+
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace('#', '');
-      if (hash) setActiveTab(hash);
+      if (hash === 'landing') {
+        setShowLanding(true);
+      } else if (hash) {
+        setShowLanding(false);
+        setActiveTab(hash);
+      }
     };
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
@@ -178,10 +225,23 @@ export const App: React.FC = () => {
     await refreshStationData();
   };
 
+  if (showLanding) {
+    return (
+      <div className={`app-root ${isLightMode ? 'light-theme' : ''}`}>
+        <ScrollVideoHero
+          onEnterApp={handleEnterApp}
+          stationsCount={stations.length}
+          platformsCount={platforms.length}
+          trainsCount={trains.length}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`app-layout ${isLightMode ? 'light-theme' : ''}`}>
       {/* Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={showLanding ? 'landing' : activeTab} onTabChange={handleTabChange} />
 
       {/* Main View Area */}
       <div className={`main-content ${activeTab === 'train-spot' ? 'train-spot-view' : ''}`}>
