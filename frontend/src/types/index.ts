@@ -222,16 +222,6 @@ export interface SimulationState {
   speedMultiplier: number;
 }
 
-export interface AlgorithmInfo {
-  name: string;
-  dataStructure: string;
-  purpose: string;
-  timeComplexity: string;
-  spaceComplexity: string;
-  whereUsed: string;
-  interviewKeyPoints: string[];
-}
-
 export type SignalAspect = 'RED' | 'YELLOW' | 'DOUBLE_YELLOW' | 'GREEN';
 export type BlockType = 'INTER_STATION' | 'APPROACH' | 'PLATFORM';
 

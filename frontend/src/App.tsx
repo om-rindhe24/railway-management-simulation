@@ -21,7 +21,6 @@ import { CorridorMap } from './pages/CorridorMap';
 import { LiveTrainSpot } from './pages/LiveTrainSpot';
 import { TrainSignalDrawer } from './components/TrainSignalDrawer';
 import { WhatIfSimulator } from './pages/WhatIfSimulator';
-import { AlgorithmLab } from './pages/AlgorithmLab';
 import { TrainManagement } from './pages/TrainManagement';
 import { AllocationHistoryPage } from './pages/AllocationHistoryPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -265,8 +264,6 @@ export const App: React.FC = () => {
             onResetSimulation={handleReset}
           />
         )}
-
-        {activeTab === 'algorithms' && <AlgorithmLab />}
 
         {activeTab === 'trains' && (
           <TrainManagement

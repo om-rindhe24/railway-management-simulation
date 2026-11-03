@@ -285,5 +285,5 @@ Returns the complete, unified snapshot:
 | **Phase D** | Train Movement & Signal Enforcement | `COMPLETED` | Connect `SimulationService` clock ticks to block progression and RED stop enforcement. |
 | **Phase E** | Platform & Delay Cascade Integration | `COMPLETED` | Interlock platform closures, occupancies, and delay reallocations with signal aspects and zero stale occupancy (10 tests). |
 | **Phase F** | Frontend Live Map Integration | `PLANNED` | Upgrade `CorridorMap.tsx` with block lanes, signal lights, and train inspection drawer. |
-| **Phase G** | What-If & Algorithm Lab Viva Expansion | `PLANNED` | Add Signalling Layer tab to Algorithm Lab and What-If perturbation analysis. |
+| **Phase G** | What-If Operations Studio Expansion | `COMPLETED` | Add isolated scenario simulation, diff assessment, and What-If perturbation analysis. |
 | **Phase H** | Full Verification & Testing | `PLANNED` | JUnit 5 invariant tests, production build (`npm run build`), updated documentation. |

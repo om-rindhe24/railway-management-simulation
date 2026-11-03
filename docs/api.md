@@ -133,7 +133,8 @@ Returns dashboard KPIs: active trains, platform utilization rate, delay distribu
 Returns chronological audit log of platform allocations and reallocations with reasoning and timestamps.
 
 ### `GET /api/algorithms/metadata`
-Returns DSA technical metadata (Priority Queue, Graph, Conflict Detector, Scoring Engine, Time/Space complexities) for the Algorithm Lab and viva presentation.
+*(Unused by frontend UI following Algorithm Lab retirement; retained for backend DSA reference and API verification)*
+Returns DSA technical metadata (Priority Queue, Graph, Conflict Detector, Scoring Engine, Time/Space complexities) for technical review and viva presentation.
 
 ---
 

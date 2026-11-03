@@ -68,7 +68,7 @@ The interface emulates a high-tech modern railway traffic management system (ins
    * Quick Status indicator ("Corridor Operational", "1 Conflict Detected").
    * Theme switcher (Dark / Light mode toggle with local storage persistence).
 2. **Sidebar**:
-   * Icon + text navigation: Overview, Live Simulation, Gantt Timeline, Network Map, What-If Simulator, Algorithm Lab, Train Management, Allocation History, Analytics.
+   * Icon + text navigation: Overview, Live Simulation, Gantt Timeline, Network Map, What-If Simulator, Train Management, Allocation History, Analytics.
    * 1-Click "Run Demo Scenario" CTA button highlighted in gold/primary glow.
 3. **KPI Cards**:
    * Glassmorphic cards with subtle hover lift and glow border.

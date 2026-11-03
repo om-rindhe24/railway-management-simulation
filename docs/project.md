@@ -16,7 +16,7 @@ The system solves the NP-hard dynamic platform assignment and conflict resolutio
 * **Placement & Portfolio Excellence**:
   * Decoupled pure Java algorithm engine accompanied by thorough unit test suites.
   * Spring Boot 3 REST API backend with clean domain layering and dual-profile database support (H2 default + MySQL 8.0).
-  * Control-room React + TypeScript UI featuring interactive Gantt timeline, corridor network visualizer, What-If scenario studio, and Algorithm Lab for technical viva explanations.
+  * Control-room React + TypeScript UI featuring interactive Gantt timeline, corridor network visualizer, What-If scenario studio, and Operations Analytics.
   * 1-Click "Run Demo Scenario" for evaluation presentations.
 
 ## 3. Real-World Accuracy & Simulation Disclaimer

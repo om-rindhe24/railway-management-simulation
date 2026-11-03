@@ -9,10 +9,20 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Controller exposing technical metadata regarding internal algorithms and data structures.
+ * 
+ * NOTE: Unused by frontend UI following the retirement of Algorithm Lab.
+ * Retained for backend technical verification, architectural documentation, and API reference.
+ */
 @RestController
 @RequestMapping("/api/algorithms")
 public class AlgorithmController {
 
+    /**
+     * Unused endpoint: GET /api/algorithms/metadata
+     * Formerly consumed by the Algorithm Lab UI. Retained for technical reference.
+     */
     @GetMapping("/metadata")
     public ResponseEntity<ApiResponse<AlgorithmMetadataDto>> getAlgorithmMetadata() {
         List<AlgorithmMetadataDto.AlgorithmInfo> list = List.of(

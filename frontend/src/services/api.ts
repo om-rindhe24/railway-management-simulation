@@ -1,6 +1,6 @@
 import {
   Station, Platform, Train, PlatformAllocation, AllocationHistory,
-  ConflictReport, AllocationDecision, ReallocationResult, SimulationState, AlgorithmInfo,
+  ConflictReport, AllocationDecision, ReallocationResult, SimulationState,
   CorridorStateDto, WhatIfPreviewResult
 } from '../types';
 
@@ -116,8 +116,4 @@ export const api = {
 
   // Analytics
   getAnalytics: () => fetchJson<Record<string, any>>('/analytics'),
-
-  // Algorithms
-  getAlgorithmMetadata: () =>
-    fetchJson<{ algorithms: AlgorithmInfo[] }>('/algorithms/metadata').then(d => d.algorithms),
 };
