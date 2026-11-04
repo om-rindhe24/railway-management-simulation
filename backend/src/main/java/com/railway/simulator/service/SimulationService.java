@@ -599,6 +599,15 @@ public class SimulationService {
                     }
                 }
 
+                // Enforce 180s max platform hold cap unless closed (for regular revenue traffic)
+                if (train.getTrainType() != TrainType.SPECIAL && train.getActualArrival() != null && dep != null) {
+                    LocalDateTime maxDep = train.getActualArrival().plusSeconds(180);
+                    if (dep.isAfter(maxDep)) {
+                        dep = maxDep;
+                        train.setActualDeparture(dep);
+                    }
+                }
+
                 // Train berthed at platform: completes dwell and departs normally even if platform was closed
                 if (dep != null && !simulationTime.isBefore(dep)) {
                     // Train departure after scheduled dwell
@@ -899,8 +908,8 @@ public class SimulationService {
                     }
                 }
 
-                Signal aheadSignal = (isEnteringStation && homeSignal != null) ? homeSignal : nextSig;
-                String aheadSignalId = (isEnteringStation && homeSignal != null) ? homeSignalId : nextSigId;
+                Signal aheadSignal = (isEnteringStation && homeSignal != null) ? homeSignal : (isInsidePlatformBlock ? null : nextSig);
+                String aheadSignalId = (isEnteringStation && homeSignal != null) ? homeSignalId : (isInsidePlatformBlock ? null : nextSigId);
 
                 boolean isAheadRed = (aheadSignal != null && aheadSignal.getCurrentAspect() == SignalAspect.RED) ||
                         (isEnteringStation && platformClosedOrOccupied);
@@ -1084,9 +1093,9 @@ public class SimulationService {
                                     int dwellSec = StoppingPatternConfig.getDwellSeconds(train.getTrainCategory(), targetStation, StoppingPatternConfig.isTerminalStation(targetStation));
                                     if (train.getActualDeparture() != null && train.getActualDeparture().isAfter(simulationTime)) {
                                         dwellSec = (int) java.time.Duration.between(simulationTime, train.getActualDeparture()).getSeconds();
-                                    } else {
-                                        train.setActualDeparture(simulationTime.plusSeconds(dwellSec));
                                     }
+                                    dwellSec = Math.min(180, Math.max(30, dwellSec));
+                                    train.setActualDeparture(simulationTime.plusSeconds(dwellSec));
                                     train.setActualArrival(simulationTime);
                                     final int finalDwellSec = dwellSec;
                                     if (assignedPlatId != null) {
@@ -1146,9 +1155,9 @@ public class SimulationService {
                                     int dwellSec = StoppingPatternConfig.getDwellSeconds(train.getTrainCategory(), targetStation, StoppingPatternConfig.isTerminalStation(targetStation));
                                     if (train.getActualDeparture() != null && train.getActualDeparture().isAfter(simulationTime)) {
                                         dwellSec = (int) java.time.Duration.between(simulationTime, train.getActualDeparture()).getSeconds();
-                                    } else {
-                                        train.setActualDeparture(simulationTime.plusSeconds(dwellSec));
                                     }
+                                    dwellSec = Math.min(180, Math.max(30, dwellSec));
+                                    train.setActualDeparture(simulationTime.plusSeconds(dwellSec));
                                     train.setActualArrival(simulationTime);
                                     final int finalDwellSec = dwellSec;
                                     if (assignedPlatId != null) {
@@ -1501,7 +1510,7 @@ public class SimulationService {
             Train occupyingTrain = trainRepository.findById(p.getCurrentTrainId()).orElse(null);
             if (occupyingTrain != null && occupyingTrain.getActualDeparture() != null) {
                 long rem = java.time.Duration.between(simulationTime, occupyingTrain.getActualDeparture()).getSeconds();
-                dto.setDwellSecondsRemaining((int) Math.max(0, rem));
+                dto.setDwellSecondsRemaining((int) Math.max(0, Math.min(180, rem)));
             } else {
                 dto.setDwellSecondsRemaining(0);
             }
@@ -1644,6 +1653,7 @@ public class SimulationService {
         train.setSpeedKmH(0.0);
         int dwellSec = StoppingPatternConfig.getDwellSeconds(train.getTrainCategory(), tgtUpper, true);
         if (dwellSec <= 0) dwellSec = 60;
+        dwellSec = Math.min(180, Math.max(30, dwellSec));
         train.setActualArrival(simulationTime);
         train.setActualDeparture(simulationTime.plusSeconds(dwellSec));
         train.setWaitingReason(null);
@@ -1688,6 +1698,8 @@ public class SimulationService {
                         now, now.plusMinutes(45), null, spec.destination);
                 t.setTrainCategory(spec.category);
                 t.setDirection(spec.direction);
+                t.setActualArrival(now);
+                t.setActualDeparture(now);
 
                 String assignedBlockId = spec.startBlockId;
                 TrackBlock startBlock = trackBlocks.get(assignedBlockId);
