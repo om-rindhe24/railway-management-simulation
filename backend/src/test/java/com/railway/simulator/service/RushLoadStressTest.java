@@ -62,6 +62,8 @@ public class RushLoadStressTest {
         int totalSharedBlockViolations = 0;
         int totalTeleportViolations = 0;
         int totalLineTypeViolations = 0;
+        int totalBrakingEnvelopeViolations = 0;
+        double maxBrakingEnvelopeOverspeed = 0.0;
         long maxTickMs = 0;
         int maxHeldSimultaneously = 0;
         String maxHeldTick = "";
@@ -208,6 +210,30 @@ public class RushLoadStressTest {
                 }
             }
 
+            // ── Invariant 3b: Braking-envelope check ──
+            for (var ts : corridor.getTrains()) {
+                if (ts.getStatus() == TrainStatus.APPROACHING) {
+                    SignalAspect aspect = ts.getSignalAspect();
+                    double speed = ts.getSpeedKmH() != null ? ts.getSpeedKmH() : 0.0;
+                    Double prog = ts.getProgressPercent();
+                    if (aspect == SignalAspect.RED && prog != null && prog < 98.0) {
+                        double dRemMeters = Math.max(0.0, (SignalSpeedConfig.STOP_PROGRESS_PERCENT - prog) / 100.0 * 2500.0);
+                        double envelopeMS = Math.sqrt(2.0 * SignalSpeedConfig.BRAKING_M_S2 * Math.max(0.0, dRemMeters));
+                        double envelopeKmH = Math.min(SignalSpeedConfig.MAX_CORRIDOR_SPEED, envelopeMS * 3.6);
+                        double allowedMax = envelopeKmH + (stepSeconds * SignalSpeedConfig.BRAKE_KMH_PER_SEC) + 5.0;
+                        if (speed > allowedMax) {
+                            r.totalBrakingEnvelopeViolations++;
+                            double overspeed = speed - envelopeKmH;
+                            if (overspeed > r.maxBrakingEnvelopeOverspeed) {
+                                r.maxBrakingEnvelopeOverspeed = overspeed;
+                            }
+                            System.err.printf("[BRAKE_ENVELOPE] %dx tick %d | %s at %.1f km/h exceeds envelope %.1f km/h (rem=%.1fm)%n",
+                                    speedMultiplier, tick, ts.getTrainNumber(), speed, envelopeKmH, dRemMeters);
+                        }
+                    }
+                }
+            }
+
             // ── Invariant 4: No teleporting (scaled by stepSeconds: delta <= (stepSeconds/25.0)*40.0%) ──
             double maxAllowedDelta = (stepSeconds / 25.0) * 40.0;
             for (var ts : corridor.getTrains()) {
@@ -307,6 +333,7 @@ public class RushLoadStressTest {
         System.out.printf("  SPADs:                    %d%n", r.totalSpads);
         System.out.printf("  Shared block violations:  %d%n", r.totalSharedBlockViolations);
         System.out.printf("  Speed-over-aspect:        %d%n", r.totalSpeedOverAspect);
+        System.out.printf("  Braking envelope viol.:   %d (max overspeed: %.2f km/h)%n", r.totalBrakingEnvelopeViolations, r.maxBrakingEnvelopeOverspeed);
         System.out.printf("  Teleport violations:      %d%n", r.totalTeleportViolations);
         System.out.printf("  Line-type violations:     %d%n", r.totalLineTypeViolations);
         System.out.printf("  Max tick wall-clock:      %d ms%n", r.maxTickMs);
@@ -328,6 +355,8 @@ public class RushLoadStressTest {
                 label + ": Expected 0 shared blocks, found " + r.totalSharedBlockViolations);
         assertEquals(0, r.totalSpeedOverAspect,
                 label + ": Expected 0 speed-over-aspect, found " + r.totalSpeedOverAspect);
+        assertEquals(0, r.totalBrakingEnvelopeViolations,
+                label + ": Expected 0 braking-envelope violations, found " + r.totalBrakingEnvelopeViolations);
         assertEquals(0, r.totalTeleportViolations,
                 label + ": Expected 0 teleports, found " + r.totalTeleportViolations);
         assertEquals(0, r.totalLineTypeViolations,

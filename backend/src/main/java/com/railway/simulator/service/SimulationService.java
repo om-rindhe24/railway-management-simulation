@@ -973,16 +973,15 @@ public class SimulationService {
                                 break;
                             }
 
-                            // Compute braking distance required to stop from current speed: d = v^2 / (2 * a)
-                            double vMS = currentSpeed / 3.6;
-                            double dBrakeMeters = (vMS * vMS) / (2.0 * SignalSpeedConfig.BRAKING_M_S2) * 1.3 + 50.0;
+                            // Step 6: Physical braking curve instead of instant clamp:
+                            // target speed = min(aspect limit, sqrt(limit_at_signal^2 + 2*0.8*(distance_to_stop_line - margin)))
+                            double trainMax = SignalSpeedConfig.getMaxSpeed(train, currentBlock);
+                            SignalAspect governingAspect = train.getSignalAspect() != null ? train.getSignalAspect() : SignalAspect.GREEN;
+                            double governingLimit = SignalSpeedConfig.getAspectSpeedLimit(governingAspect, trainMax);
 
-                            double targetSpeed;
-                            if (dRemMeters <= dBrakeMeters) {
-                                targetSpeed = 0.0;
-                            } else {
-                                targetSpeed = SignalSpeedConfig.SPEED_YELLOW;
-                            }
+                            double dEffective = Math.max(0.0, dRemMeters - 10.0);
+                            double targetSpeedMS = Math.sqrt(2.0 * SignalSpeedConfig.BRAKING_M_S2 * dEffective);
+                            double targetSpeed = Math.min(governingLimit, targetSpeedMS * 3.6);
 
                             if (currentSpeed < targetSpeed) {
                                 currentSpeed = Math.min(targetSpeed, currentSpeed + SignalSpeedConfig.ACCEL_KMH_PER_SEC);
@@ -1043,13 +1042,9 @@ public class SimulationService {
                                 // Downstream lookahead deceleration towards restrictive signal ahead
                                 double targetAspectSpeed = SignalSpeedConfig.getAspectSpeedLimit(aheadAspect, trainMax);
                                 double vTargetMS = targetAspectSpeed / 3.6;
-                                double curVMS = currentSpeed / 3.6;
-                                if (curVMS > vTargetMS) {
-                                    double dBrakeMeters = Math.max(0.0, (curVMS * curVMS - vTargetMS * vTargetMS) / (2.0 * SignalSpeedConfig.BRAKING_M_S2)) * 1.3 + 50.0;
-                                    if (dRemToStationMeters <= dBrakeMeters) {
-                                        targetSpeed = Math.min(targetSpeed, targetAspectSpeed);
-                                    }
-                                }
+                                double dEffective = Math.max(0.0, dRemToStationMeters - 10.0);
+                                double curveTargetMS = Math.sqrt(vTargetMS * vTargetMS + 2.0 * SignalSpeedConfig.BRAKING_M_S2 * dEffective);
+                                targetSpeed = Math.min(targetSpeed, curveTargetMS * 3.6);
                             }
 
                             double stepStartSpeed = currentSpeed;
