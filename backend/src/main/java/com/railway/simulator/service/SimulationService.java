@@ -1692,7 +1692,24 @@ public class SimulationService {
                         now, now.plusMinutes(45), null, spec.destination);
                 t.setTrainCategory(spec.category);
                 t.setDirection(spec.direction);
-                t.setCurrentBlockId(spec.startBlockId);
+
+                String assignedBlockId = spec.startBlockId;
+                TrackBlock startBlock = trackBlocks.get(assignedBlockId);
+                if (startBlock != null && startBlock.isOccupied()) {
+                    // Start block is occupied by an existing train moving in corridor.
+                    // Find an unoccupied block with matching line type and direction.
+                    String lineSuffix = assignedBlockId.substring(assignedBlockId.lastIndexOf('-'));
+                    assignedBlockId = trackBlocks.values().stream()
+                            .filter(b -> !b.isOccupied() && !b.isClosed()
+                                    && b.getBlockType() == BlockType.INTER_STATION
+                                    && b.getBlockId().endsWith(lineSuffix)
+                                    && spec.direction.equalsIgnoreCase(b.getDirection()))
+                            .map(TrackBlock::getBlockId)
+                            .findFirst()
+                            .orElse(spec.startBlockId);
+                }
+
+                t.setCurrentBlockId(assignedBlockId);
                 t.setProgressPercent(spec.progress);
                 t.setSpeedKmH(spec.speed);
                 t.setStatus(TrainStatus.APPROACHING);
@@ -1711,8 +1728,8 @@ public class SimulationService {
                 t.setTargetStationCode(rp.getNextStopStationCode());
 
                 t = trainRepository.save(t);
-                if (trackBlocks.containsKey(spec.startBlockId)) {
-                    trackBlocks.get(spec.startBlockId).occupy(t.getTrainId(), t.getTrainNumber());
+                if (trackBlocks.containsKey(assignedBlockId)) {
+                    trackBlocks.get(assignedBlockId).occupy(t.getTrainId(), t.getTrainNumber());
                 }
                 addedCount++;
             }
