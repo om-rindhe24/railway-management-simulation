@@ -1,0 +1,162 @@
+/* ─────────────────────────────────────────────────────────────
+   RAILFLOW ENGINE — Railway Signal Design Palette (Landing Page)
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --rf-bg: #0B0C10;          /* Warm near-black base */
+  --rf-bg-2: #14161D;        /* Cards, panels, surfaces */
+  --rf-line: #2A2D38;        /* Borders, tracks, separators */
+  --rf-text: #F5F1E8;        /* Warm off-white high-contrast text */
+  --rf-muted: #9A9CA8;       /* Secondary neutral text (contrast > 5.5:1 on #0B0C10 and #14161D) */
+  --rf-amber: #FFB020;       /* Primary accent: headlights, CTA button, focus indicators */
+  --rf-red: #E5383B;         /* Western Railway stripe, stop signal, warning accents */
+  --rf-green: #2BD576;       /* Go signal, telemetry active dots */
+  --rf-train-body: #EDE6D6;  /* Locomotive outer cab body */
+
+  /* Derived atmospheric tokens */
+  --rf-amber-glow: rgba(255, 176, 32, 0.35);
+  --rf-amber-glow-strong: rgba(255, 176, 32, 0.65);
+  --rf-amber-subtle: rgba(255, 176, 32, 0.12);
+  --rf-amber-border: rgba(255, 176, 32, 0.45);
+}
+
+/* Landing Page Scope */
+.landing-root {
+  background-color: var(--rf-bg);
+  color: var(--rf-text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Badge: Western Railway Corridor Dispatch */
+.landing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: var(--rf-amber-subtle);
+  border: 1px solid var(--rf-amber-border);
+  color: var(--rf-amber);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  box-shadow: 0 0 16px var(--rf-amber-subtle);
+}
+
+/* Skip Intro Button (Secondary Outline) */
+.landing-btn-secondary {
+  background: rgba(20, 22, 29, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--rf-line);
+  color: var(--rf-text);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+}
+
+.landing-btn-secondary:hover {
+  border-color: var(--rf-amber);
+  color: var(--rf-amber);
+  box-shadow: 0 0 16px var(--rf-amber-subtle);
+}
+
+.landing-btn-secondary:focus-visible {
+  outline: 2px solid var(--rf-amber);
+  outline-offset: 2px;
+}
+
+/* Primary CTA Button (Solid Amber with Dark Text) */
+.landing-btn-primary {
+  background: var(--rf-amber);
+  color: var(--rf-bg);
+  border: none;
+  padding: 16px 38px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 24px var(--rf-amber-glow), 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 36px var(--rf-amber-glow-strong), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+.landing-btn-primary:focus-visible {
+  outline: 2px solid var(--rf-text);
+  outline-offset: 3px;
+}
+
+/* Card Surface */
+.landing-card {
+  background: var(--rf-bg-2);
+  border: 1px solid var(--rf-line);
+  border-radius: var(--radius-md, 12px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-card:hover {
+  border-color: rgba(255, 176, 32, 0.3);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Signal Indicator Dot */
+.signal-dot-green {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--rf-green);
+  box-shadow: 0 0 8px var(--rf-green);
+}
+
+.signal-dot-red {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--rf-red);
+  box-shadow: 0 0 8px var(--rf-red);
+}
+
+.signal-dot-amber {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--rf-amber);
+  box-shadow: 0 0 8px var(--rf-amber);
+}
+
+/* Fullscreen Headlight Wash Overlay */
+.headlight-wash-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 65%, rgba(255, 248, 230, 0.95) 0%, rgba(255, 176, 32, 0.8) 35%, rgba(11, 12, 16, 0.95) 100%);
+  z-index: 25;
+  will-change: opacity;
+}
+
