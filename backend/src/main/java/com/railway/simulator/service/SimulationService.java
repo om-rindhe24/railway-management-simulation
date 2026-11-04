@@ -885,10 +885,6 @@ public class SimulationService {
                         homeSignalId = "SIG-" + targetStation + "-P" + compatibleFree.getPlatformNumber();
                         homeSignal = signals.get(homeSignalId);
                         train.setNextSignalId(homeSignalId);
-                        if (homeSignal != null) {
-                            homeSignal.setCurrentAspect(SignalAspect.GREEN);
-                            homeSignal.setAspectReason("Platform " + compatibleFree.getPlatformNumber() + " route clear");
-                        }
                         platformClosedOrOccupied = false;
 
                         if (oldP != null && !oldP.equals(compatibleFree.getPlatformNumber())) {

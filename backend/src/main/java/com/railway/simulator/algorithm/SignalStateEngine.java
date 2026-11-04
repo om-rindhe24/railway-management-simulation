@@ -9,34 +9,45 @@ import com.railway.simulator.domain.TrackBlock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Deterministic Signal State Engine for the educational railway simulation corridor.
+ * Deterministic Signal State Engine for the railway simulation corridor.
  * Evaluates signal aspects and human-readable explanations from track block occupancy,
- * downstream route conditions, platform availability, and platform starter exit gates.
+ * platform reservation, downstream route conditions, and platform starter exit gates.
  *
- * NOTE: Educational simulation model only. Does not reproduce official Indian Railways rules.
+ * Aspect lookahead in one place:
+ *   - RED if the block or platform ahead is closed, occupied, or reserved
+ *   - YELLOW if the next signal is RED
+ *   - DOUBLE_YELLOW if the signal after next is RED (or next is YELLOW)
+ *   - Else GREEN
  */
 public class SignalStateEngine {
 
-    /**
-     * Evaluates the aspect and reason for a single signal given the block and signal topologies.
-     */
     public void evaluateSignal(Signal signal,
                                Map<String, TrackBlock> blockMap,
                                Map<String, Signal> signalMap,
                                Map<String, Platform> platformMap) {
-        evaluateSignal(signal, blockMap, signalMap, platformMap, null);
+        evaluateSignal(signal, blockMap, signalMap, platformMap, Collections.emptySet(), null);
     }
 
     public void evaluateSignal(Signal signal,
                                Map<String, TrackBlock> blockMap,
                                Map<String, Signal> signalMap,
                                Map<String, Platform> platformMap,
+                               LocalDateTime simulationTime) {
+        evaluateSignal(signal, blockMap, signalMap, platformMap, Collections.emptySet(), simulationTime);
+    }
+
+    public void evaluateSignal(Signal signal,
+                               Map<String, TrackBlock> blockMap,
+                               Map<String, Signal> signalMap,
+                               Map<String, Platform> platformMap,
+                               Set<String> reservedBlockIds,
                                LocalDateTime simulationTime) {
         if (!signal.isEnabled()) {
             signal.setCurrentAspect(SignalAspect.RED);
@@ -76,7 +87,14 @@ public class SignalStateEngine {
             return;
         }
 
-        // 3. Platform Block Interlocking Gate (RED for Home Signal)
+        // 3. Immediate Block Reserved Gate (RED)
+        if (reservedBlockIds != null && reservedBlockIds.contains(protectedBlockId)) {
+            signal.setCurrentAspect(SignalAspect.RED);
+            signal.setAspectReason("Protected block " + protectedBlockId + " is RESERVED");
+            return;
+        }
+
+        // 4. Platform Block Interlocking Gate (RED for Home Signal)
         if (protectedBlock.getBlockType() == BlockType.PLATFORM && platformMap != null) {
             Platform platform = platformMap.get(protectedBlockId);
             if (platform != null) {
@@ -91,13 +109,18 @@ public class SignalStateEngine {
                     signal.setAspectReason("Platform " + platform.getPlatformNumber() + " is OCCUPIED" + trainInfo);
                     return;
                 }
+                if (reservedBlockIds != null && reservedBlockIds.contains(protectedBlockId)) {
+                    signal.setCurrentAspect(SignalAspect.RED);
+                    signal.setAspectReason("Platform " + platform.getPlatformNumber() + " is RESERVED by approaching train");
+                    return;
+                }
                 signal.setCurrentAspect(SignalAspect.GREEN);
                 signal.setAspectReason("Platform route clear: platform open and unoccupied");
                 return;
             }
         }
 
-        // 4. Immediate Block is CLEAR: Look ahead to downstream blocks
+        // 5. Lookahead: YELLOW if next signal is RED; DOUBLE_YELLOW if the one after is RED; else GREEN
         String nextSignalId = signal.getNextSignalId();
         if (nextSignalId == null || !signalMap.containsKey(nextSignalId)) {
             // End of monitored corridor or entering clear terminal section
@@ -119,6 +142,9 @@ public class SignalStateEngine {
             } else if (nextBlock.isOccupied()) {
                 nextBlockBlocked = true;
                 nextBlockReason = "occupied by " + (nextBlock.getOccupyingTrainNumber() != null ? nextBlock.getOccupyingTrainNumber() : "train");
+            } else if (reservedBlockIds != null && reservedBlockIds.contains(nextProtectedBlockId)) {
+                nextBlockBlocked = true;
+                nextBlockReason = "reserved";
             } else if (nextBlock.getBlockType() == BlockType.PLATFORM && platformMap != null) {
                 Platform p = platformMap.get(nextProtectedBlockId);
                 if (p != null && (p.getIsClosed() || p.getIsOccupied())) {
@@ -158,6 +184,8 @@ public class SignalStateEngine {
         if (downstreamBlock != null) {
             if (downstreamBlock.isClosed() || downstreamBlock.isOccupied()) {
                 downstreamBlockBlocked = true;
+            } else if (reservedBlockIds != null && reservedBlockIds.contains(downstreamBlockId)) {
+                downstreamBlockBlocked = true;
             } else if (downstreamBlock.getBlockType() == BlockType.PLATFORM && platformMap != null) {
                 Platform p = platformMap.get(downstreamBlockId);
                 if (p != null && (p.getIsClosed() || p.getIsOccupied())) {
@@ -182,7 +210,7 @@ public class SignalStateEngine {
                                    Map<String, TrackBlock> blockMap,
                                    Map<String, Signal> signalMap,
                                    Map<String, Platform> platformMap) {
-        evaluateAllSignals(signals, blockMap, signalMap, platformMap, null);
+        evaluateAllSignals(signals, blockMap, signalMap, platformMap, Collections.emptySet(), null);
     }
 
     public void evaluateAllSignals(Collection<Signal> signals,
@@ -190,17 +218,26 @@ public class SignalStateEngine {
                                    Map<String, Signal> signalMap,
                                    Map<String, Platform> platformMap,
                                    LocalDateTime simulationTime) {
+        evaluateAllSignals(signals, blockMap, signalMap, platformMap, Collections.emptySet(), simulationTime);
+    }
+
+    public void evaluateAllSignals(Collection<Signal> signals,
+                                   Map<String, TrackBlock> blockMap,
+                                   Map<String, Signal> signalMap,
+                                   Map<String, Platform> platformMap,
+                                   Set<String> reservedBlockIds,
+                                   LocalDateTime simulationTime) {
         List<Signal> ordered = getDownstreamToUpstreamOrder(signals, signalMap);
         for (Signal signal : ordered) {
-            evaluateSignal(signal, blockMap, signalMap, platformMap, simulationTime);
+            evaluateSignal(signal, blockMap, signalMap, platformMap, reservedBlockIds, simulationTime);
         }
     }
 
     private void evaluateStarterSignal(Signal signal,
-                                       Map<String, TrackBlock> blockMap,
-                                       Map<String, Signal> signalMap,
-                                       Map<String, Platform> platformMap,
-                                       LocalDateTime simulationTime) {
+                                        Map<String, TrackBlock> blockMap,
+                                        Map<String, Signal> signalMap,
+                                        Map<String, Platform> platformMap,
+                                        LocalDateTime simulationTime) {
         String pBlockId = "BLK-" + signal.getSignalId().substring(4, signal.getSignalId().length() - 8);
         Platform platform = platformMap != null ? platformMap.get(pBlockId) : null;
         TrackBlock pBlock = blockMap != null ? blockMap.get(pBlockId) : null;
