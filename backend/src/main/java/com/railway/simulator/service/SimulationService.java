@@ -578,12 +578,43 @@ public class SimulationService {
                 }
             }
 
-            if (currentBlockId == null && simulationTime.isBefore(arr)) {
-                // Scheduled in the future
+            if (currentBlockId == null) {
+                // Deferred spawn or scheduled: check if a free matching block is available
+                if (isPeakHour && train.getTrainNumber().startsWith("SIM-PK-")) {
+                    String preferredLine = (train.getTrainCategory() == TrainCategory.SLOW_LOCAL) ?
+                            ("UP".equalsIgnoreCase(train.getDirection()) ? "-SU" : "-SD") :
+                            ("UP".equalsIgnoreCase(train.getDirection()) ? "-FU" : "-FD");
+                    TrackBlock freeBlock = trackBlocks.values().stream()
+                            .filter(b -> !b.isOccupied() && !b.isClosed()
+                                    && b.getBlockType() == BlockType.INTER_STATION
+                                    && b.getBlockId().endsWith(preferredLine)
+                                    && train.getDirection().equalsIgnoreCase(b.getDirection()))
+                            .findFirst()
+                            .orElse(null);
+                    if (freeBlock != null) {
+                        train.setCurrentBlockId(freeBlock.getBlockId());
+                        train.setProgressPercent(0.0);
+                        double maxSpd = SignalSpeedConfig.getMaxSpeed(train, freeBlock);
+                        train.setSpeedKmH(Math.min(maxSpd, 50.0));
+                        train.setStatus(TrainStatus.APPROACHING);
+                        train.setSignalAspect(SignalAspect.GREEN);
+                        train.setWaitingReason(null);
+                        freeBlock.occupy(train.getTrainId(), train.getTrainNumber());
+
+                        RouteProgress rp = corridorGraph.computeRouteProgress(train);
+                        train.setLastStationCode(rp.getLastStationCode());
+                        train.setUpcomingStationCode(rp.getUpcomingStationCode());
+                        train.setCurrentStationCode(rp.getLastStationCode());
+                        train.setNextStopStationCode(rp.getNextStopStationCode());
+                        train.setTargetStationCode(rp.getNextStopStationCode());
+                        trainRepository.save(train);
+                        continue;
+                    }
+                }
                 train.setStatus(TrainStatus.SCHEDULED);
                 train.setProgressPercent(0.0);
                 train.setSpeedKmH(0.0);
-                train.setWaitingReason(null);
+                continue;
             } else if (train.getStatus() == TrainStatus.AT_PLATFORM) {
                 // Synchronize platform block with assigned platform at the same station
                 String curBlk = train.getCurrentBlockId();
@@ -1709,14 +1740,23 @@ public class SimulationService {
                                     && spec.direction.equalsIgnoreCase(b.getDirection()))
                             .map(TrackBlock::getBlockId)
                             .findFirst()
-                            .orElse(spec.startBlockId);
+                            .orElse(null);
                 }
 
-                t.setCurrentBlockId(assignedBlockId);
-                t.setProgressPercent(spec.progress);
-                t.setSpeedKmH(spec.speed);
-                t.setStatus(TrainStatus.APPROACHING);
-                t.setSignalAspect(SignalAspect.GREEN);
+                if (assignedBlockId != null) {
+                    t.setCurrentBlockId(assignedBlockId);
+                    t.setProgressPercent(spec.progress);
+                    t.setSpeedKmH(spec.speed);
+                    t.setStatus(TrainStatus.APPROACHING);
+                    t.setSignalAspect(SignalAspect.GREEN);
+                } else {
+                    // Defer spawn: no free block exists currently
+                    t.setCurrentBlockId(null);
+                    t.setProgressPercent(0.0);
+                    t.setSpeedKmH(0.0);
+                    t.setStatus(TrainStatus.SCHEDULED);
+                    t.setWaitingReason("Spawn deferred: waiting for free block on " + spec.startBlockId);
+                }
                 t.setIsActive(true);
                 t.setDelayMinutes(0);
 
@@ -1731,7 +1771,7 @@ public class SimulationService {
                 t.setTargetStationCode(rp.getNextStopStationCode());
 
                 t = trainRepository.save(t);
-                if (trackBlocks.containsKey(assignedBlockId)) {
+                if (assignedBlockId != null && trackBlocks.containsKey(assignedBlockId)) {
                     trackBlocks.get(assignedBlockId).occupy(t.getTrainId(), t.getTrainNumber());
                 }
                 addedCount++;

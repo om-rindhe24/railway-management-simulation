@@ -234,8 +234,9 @@ public class RushLoadStressTest {
                 }
             }
 
-            // ── Invariant 4: No teleporting (scaled by stepSeconds: delta <= (stepSeconds/25.0)*40.0%) ──
-            double maxAllowedDelta = (stepSeconds / 25.0) * 40.0;
+            // ── Invariant 4: No teleporting (physical bound: displacement <= 110 km/h * stepSeconds * 1.05) ──
+            double maxAllowedDisplacementKm = 110.0 * (stepSeconds / 3600.0) * 1.05;
+            double maxAllowedDelta = (maxAllowedDisplacementKm / 2.5) * 100.0;
             for (var ts : corridor.getTrains()) {
                 String tn = ts.getTrainNumber();
                 String oldB = blockBefore.get(tn);
@@ -245,12 +246,13 @@ public class RushLoadStressTest {
                 if (ts.getStatus() == TrainStatus.APPROACHING && oldB != null && oldB.equals(newB)
                         && oldP != null && newP != null) {
                     double delta = newP - oldP;
-                    if (delta > maxAllowedDelta + 0.5) {
+                    double displacementKm = 2.5 * (Math.max(0, delta) / 100.0);
+                    if (displacementKm > maxAllowedDisplacementKm + 1e-3) {
                         r.totalTeleportViolations++;
-                        System.err.printf("[TELEPORT] %dx tick %d | %s jumped %.1f%% in block %s (limit: %.1f%%)%n",
-                                speedMultiplier, tick, tn, delta, newB, maxAllowedDelta);
+                        System.err.printf("[TELEPORT] %dx tick %d | %s jumped %.3f km (%.1f%%) in block %s (physical limit: %.3f km)%n",
+                                speedMultiplier, tick, tn, displacementKm, delta, newB, maxAllowedDisplacementKm);
                     }
-                    totalDistKm.merge(tn, 2.5 * (Math.max(0, delta) / 100.0), Double::sum);
+                    totalDistKm.merge(tn, displacementKm, Double::sum);
                 } else if (oldB != null && !oldB.equals(newB)) {
                     totalDistKm.merge(tn, 2.0, Double::sum);
                 }
