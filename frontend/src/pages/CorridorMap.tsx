@@ -1053,7 +1053,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                               </div>
 
                               {plat.dwellSecondsRemaining != null && isPlatOccupied && (
-                                <span style={{ fontSize: '0.68rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.68rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                   ⏱ {plat.dwellSecondsRemaining}s left
                                 </span>
                               )}

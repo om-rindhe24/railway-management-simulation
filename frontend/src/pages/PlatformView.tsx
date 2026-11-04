@@ -94,6 +94,7 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
           const currentTrain = getPlatformBerthOccupant(platform, selectedStation, trains);
           const isOccupied = Boolean(currentTrain);
           const waitingTrains = getPlatformWaitingTrains(platform, selectedStation, trains, currentTrain?.trainNumber, 2);
+          const isHeldWaiting = waitingTrains.some(t => t.status === 'WAITING' || (t as any).status === 'HELD' || ((t as any).waitingReason && (t as any).waitingReason.toLowerCase().includes('platform')));
 
           return (
             <div
@@ -225,29 +226,51 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                     </div>
                   ) : isOccupied && currentTrain ? (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', fontWeight: 700, fontSize: '0.85rem' }}>
-                          <TrainIcon size={14} />
-                          <span>Docked: {currentTrain.trainNumber}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-warning)', fontWeight: 700, fontSize: '0.85rem', minWidth: 0 }}>
+                          <TrainIcon size={14} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Docked: {currentTrain.trainNumber}</span>
                         </div>
                         {platform.dwellSecondsRemaining != null && (
-                          <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                          <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
                             ⏱ {platform.dwellSecondsRemaining}s left
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-main)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-main)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {currentTrain.trainName || 'Suburban Train Service'}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Location: <strong style={{ color: '#f8fafc' }}>{formatTrainLocation(currentTrain)}</strong></span>
-                        <span style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Next: {formatNextStop(currentTrain)}</span>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>Location: <strong style={{ color: '#f8fafc' }}>{formatTrainLocation(currentTrain)}</strong></span>
+                        <span style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>Next: {formatNextStop(currentTrain)}</span>
                       </div>
+                      {isHeldWaiting && (
+                        <div style={{ marginTop: '8px' }}>
+                          <span
+                            className="badge badge-warning"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              color: '#f87171',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Held at signal – waiting for platform
+                          </span>
+                        </div>
+                      )}
                       {waitingTrains.length > 0 && (
                         <div style={{ fontSize: '0.72rem', color: '#eab308', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          <span>Next Waiting:</span>
+                          <span style={{ whiteSpace: 'nowrap' }}>Next Waiting:</span>
                           {waitingTrains.map((wt) => (
-                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(234, 179, 8, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(234, 179, 8, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(234, 179, 8, 0.3)', whiteSpace: 'nowrap' }}>
                               {wt.trainNumber}
                             </span>
                           ))}
@@ -259,11 +282,33 @@ export const PlatformView: React.FC<PlatformViewProps> = ({
                       <div style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>
                         Track clear. Ready for incoming arrival.
                       </div>
+                      {isHeldWaiting && (
+                        <div style={{ marginTop: '8px' }}>
+                          <span
+                            className="badge badge-warning"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              color: '#f87171',
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Held at signal – waiting for platform
+                          </span>
+                        </div>
+                      )}
                       {waitingTrains.length > 0 && (
                         <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          <span>Next Waiting:</span>
+                          <span style={{ whiteSpace: 'nowrap' }}>Next Waiting:</span>
                           {waitingTrains.map((wt) => (
-                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                            <span key={wt.trainNumber} style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(56, 189, 248, 0.3)', whiteSpace: 'nowrap' }}>
                               {wt.trainNumber}
                             </span>
                           ))}
