@@ -704,21 +704,37 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                   (b.fromStationCode === nextStation.stationCode && b.toStationCode === station.stationCode && b.lineType === 'SLOW_DOWN')
               );
 
-              if (fastUpBlock) {
-                fastUpSignal = signals.find((s) => s.protectedBlockId === fastUpBlock?.blockId);
-                fastUpTrains = activeTrains.filter((t) => t.currentBlockId === fastUpBlock?.blockId && t.status !== 'AT_PLATFORM');
+              const fuBlock = fastUpBlock;
+              if (fuBlock) {
+                fastUpTrains = activeTrains.filter((t) => t.currentBlockId === fuBlock.blockId && t.status !== 'AT_PLATFORM');
+                const t0 = fastUpTrains[0];
+                fastUpSignal = t0?.nextSignalId
+                  ? signals.find((s) => s.signalId === t0.nextSignalId)
+                  : (fuBlock.nextBlockId ? signals.find((s) => s.protectedBlockId === fuBlock.nextBlockId) : signals.find((s) => s.protectedBlockId === fuBlock.blockId));
               }
-              if (slowUpBlock) {
-                slowUpSignal = signals.find((s) => s.protectedBlockId === slowUpBlock?.blockId);
-                slowUpTrains = activeTrains.filter((t) => t.currentBlockId === slowUpBlock?.blockId && t.status !== 'AT_PLATFORM');
+              const suBlock = slowUpBlock;
+              if (suBlock) {
+                slowUpTrains = activeTrains.filter((t) => t.currentBlockId === suBlock.blockId && t.status !== 'AT_PLATFORM');
+                const t0 = slowUpTrains[0];
+                slowUpSignal = t0?.nextSignalId
+                  ? signals.find((s) => s.signalId === t0.nextSignalId)
+                  : (suBlock.nextBlockId ? signals.find((s) => s.protectedBlockId === suBlock.nextBlockId) : signals.find((s) => s.protectedBlockId === suBlock.blockId));
               }
-              if (fastDnBlock) {
-                fastDnSignal = signals.find((s) => s.protectedBlockId === fastDnBlock?.blockId);
-                fastDnTrains = activeTrains.filter((t) => t.currentBlockId === fastDnBlock?.blockId && t.status !== 'AT_PLATFORM');
+              const fdBlock = fastDnBlock;
+              if (fdBlock) {
+                fastDnTrains = activeTrains.filter((t) => t.currentBlockId === fdBlock.blockId && t.status !== 'AT_PLATFORM');
+                const t0 = fastDnTrains[0];
+                fastDnSignal = t0?.nextSignalId
+                  ? signals.find((s) => s.signalId === t0.nextSignalId)
+                  : (fdBlock.nextBlockId ? signals.find((s) => s.protectedBlockId === fdBlock.nextBlockId) : signals.find((s) => s.protectedBlockId === fdBlock.blockId));
               }
-              if (slowDnBlock) {
-                slowDnSignal = signals.find((s) => s.protectedBlockId === slowDnBlock?.blockId);
-                slowDnTrains = activeTrains.filter((t) => t.currentBlockId === slowDnBlock?.blockId && t.status !== 'AT_PLATFORM');
+              const sdBlock = slowDnBlock;
+              if (sdBlock) {
+                slowDnTrains = activeTrains.filter((t) => t.currentBlockId === sdBlock.blockId && t.status !== 'AT_PLATFORM');
+                const t0 = slowDnTrains[0];
+                slowDnSignal = t0?.nextSignalId
+                  ? signals.find((s) => s.signalId === t0.nextSignalId)
+                  : (sdBlock.nextBlockId ? signals.find((s) => s.protectedBlockId === sdBlock.nextBlockId) : signals.find((s) => s.protectedBlockId === sdBlock.blockId));
               }
             }
 

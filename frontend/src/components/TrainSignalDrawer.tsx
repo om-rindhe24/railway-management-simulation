@@ -36,9 +36,7 @@ export const TrainSignalDrawer: React.FC<TrainSignalDrawerProps> = ({
     train.signalAspect === 'RED';
 
   // Find corresponding signal and track block
-  const controllingSignal = signals.find(
-    (s) => s.signalId === train.nextSignalId || s.protectedBlockId === train.currentBlockId
-  );
+  const controllingSignal = signals.find((s) => s.signalId === train.nextSignalId);
   const currentBlock = trackBlocks.find((b) => b.blockId === train.currentBlockId);
 
   const isUp = currentBlock

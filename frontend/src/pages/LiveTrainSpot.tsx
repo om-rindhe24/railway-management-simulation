@@ -1017,7 +1017,7 @@ export const LiveTrainSpot: React.FC<LiveTrainSpotProps> = ({
     const train = activeTrains.find((t) => t.trainId === activeSelectedTrainId);
     if (!train) return null;
 
-    const sig = signals.find((s) => s.signalId === train.nextSignalId || s.protectedBlockId === train.currentBlockId);
+    const sig = signals.find((s) => s.signalId === train.nextSignalId);
     const aspect = sig?.aspect || train.signalAspect || 'GREEN';
     const sigId = sig?.signalId || train.nextSignalId || 'SIG-AUTO';
     const maxLimit = getAspectLimit(aspect);
